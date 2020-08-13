@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+
+<body style="margin: 0; width: 100vw; height: 100vh;">
+  <canvas id="canvas"></canvas>
+  <script type="text/javascript">
+    class CanvasA {
+      ctx = undefined
+      innerWidth = innerWidth
+      innerHeight = innerHeight
+      moveTime = 3 // move time
+      moveSpeed = 3
+      commonW = innerWidth / 10
+      commonH = innerHeight / 10
+      roadSurface = innerHeight * 0.8 // road position
+      // let startTime = 0 // start time
+      roadUnderLines = [] // lines about under the road
+      obstacles = []
+
+      personX = 0
+      personY = 0
+
+      operate = {
+        jump: false,
+        squat: false,
+        left: false,
+        right: false,
+      }
+      moveUp = false // is moving up
+      // this.traverse = 0 // left: -1, right: 1, noMove: 0
+
+      constructor() {
+        const { innerWidth, innerHeight } = window
+        const NodeCanvas = document.querySelector('#canvas')
+        NodeCanvas.width = innerWidth
+        NodeCanvas.height = innerHeight
+        this.ctx = NodeCanvas.getContext('2d')
+
+        document.addEventListener('keydown', (e) => {
+          const KEY_DOWN = {
+            38: () => this.operate.jump = true,
+            40: () => this.operate.squat = true,
+            37: () => {
+              this.operate.left = true
+              // !this.operate.jump && (this.traverse = -1)
+            },
+            39: () => {
+              this.operate.right = true
+              // !this.operate.jump && (this.traverse = 1)
+            },
+            32: 'space',
+          }
+          KEY_DOWN[e.keyCode] && KEY_DOWN[e.keyCode].call(this)
+        })
+
+        document.addEventListener('keyup', (e) => {
+          const KEY_UP = {
+            // 38: () => this.operate.jump = false,
+            40: () => this.operate.squat = false,
+            37: () => this.operate.left = false,
+            39: () => this.operate.right = false,
+            32: 'space',
+          }
+          KEY_UP[e.keyCode] && KEY_UP[e.keyCode].call(this)
+        })
+        this.init()
+      }
+
+      init() {
+        // startTime = +new Date()
+        this.roadUnderLines = []
+        this.obstacles = []
+        this.randomUnderLines(Math.round(Math.random() * 5) + 1, 0)
+        this.randomObstacle(Math.round(Math.random() * 3) + 1)
+        console.log(this.obstacles)
+
+        this.draw()
+      }
+
+      // background line delete last
+      drawBgLine() {
+        for (let i = 1; i <= 9; i++) {
+          this.ctx.beginPath()
+          this.ctx.moveTo((this.innerWidth / 10) * i, 0)
+          this.ctx.lineTo((this.innerWidth / 10) * i, this.innerHeight)
+          this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)'
+          this.ctx.lineWidth = 1
+          this.ctx.stroke()
+        }
+
+        for (let i = 1; i <= 9; i++) {
+          this.ctx.beginPath()
+          this.ctx.moveTo(0, (this.innerHeight / 10) * i)
+          this.ctx.lineTo(this.innerWidth, (this.innerHeight / 10) * i)
+          this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)'
+          this.ctx.lineWidth = 1
+          this.ctx.stroke()
+        }
+      }
+
+      drawRoad() {
+        this.ctx.beginPath()
+        this.ctx.moveTo(0, this.roadSurface)
+        this.ctx.lineTo(this.innerWidth, this.roadSurface)
+        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)'
+        this.ctx.lineWidth = 10
+        this.ctx.stroke()
+        this.roadUnderLines.forEach((item, index) => {
+          const movingDistance = this.innerWidth / (this.moveTime * 1000) * (+new Date() - item.startTime)
+          if (item.positionX + item.length - movingDistance < 0) {
+            this.roadUnderLines.splice(index, 1)
+          } else {
+            this.ctx.beginPath()
+            this.ctx.moveTo(item.positionX - movingDistance, item.positionY)
+            this.ctx.lineTo(item.positionX + item.length - movingDistance, item.positionY)
+            this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)'
+            this.ctx.lineWidth = item.width
+            this.ctx.stroke()
+          }
+        })
+        this.roadUnderLines.length < 3 && this.randomUnderLines(Math.round(Math.random() * 2) + 1, this.innerWidth)
+      }
+
+      draw() {
+        this.ctx.clearRect(0, 0, innerWidth, innerHeight)
+        // ctx.save()
+        this.drawBgLine()
+        this.drawRoad()
+        this.drawPeople()
+        this.drawObstacle()
+        requestAnimationFrame(() => this.draw())
+      }
+
+      drawObstacle() {
+        this.ctx.save()
+        this.ctx.translate(0, this.roadSurface)
+        this.obstacles.forEach((item, index) => {
+          const movingDistance = this.innerWidth / (this.moveTime * 1000) * (+new Date() - item.startTime)
+          if (item.positionX + item.width - movingDistance < 0) {
+            this.obstacles.splice(index, 1)
+          } else {
+            this.ctx.beginPath()
+            this.ctx.rect(
+              item.positionX - movingDistance,
+              item.positionY,
+              item.width,
+              -item.height,
+            )
+            this.ctx.fillStyle = 'black'
+            this.ctx.fill()
+
+          }
+        })
+        this.ctx.restore()
+        this.obstacles.filter(i => {
+          const movingDistance = this.innerWidth / (this.moveTime * 1000) * (+new Date() - i.startTime)
+          return i.positionX - movingDistance + i.width > this.innerWidth
+        }).length < 2 && this.randomObstacle(1)
+      }
+
+      drawPeople() {
+        // the person height become half when squat
+        // height is negative because the axial is drop
+        const personH = this.operate.squat ? -this.commonH : 2 * -this.commonH
+        // // do not move when jumping
+        // const perX = this.personX +
+        //   (this.operate.jump
+        //     ? (this.traverse < 0 ? (-this.moveSpeed) : this.traverse > 0 ? this.moveSpeed : 0)
+        //     : (this.operate.left ? (-this.moveSpeed) : this.operate.right ? this.moveSpeed : 0))
+
+        const perX = this.personX + (this.operate.left ? (-this.moveSpeed) : this.operate.right ? this.moveSpeed : 0)
+        let x = this.commonW + perX
+        // person left or right position is reach the border
+        if (x > 0 && x < this.innerWidth - this.commonW) {
+          this.personX = perX
+        } else if (x <= 0) {
+          x = 0
+          this.personX = -this.commonW
+        } else if (x >= this.innerWidth - this.commonW) {
+          x = this.innerWidth - this.commonW
+          this.personX = this.innerWidth - 2 * this.commonW
+        }
+
+        // person use box temporarily
+        this.ctx.save()
+        this.ctx.translate(0, this.roadSurface)
+        this.ctx.beginPath()
+        this.ctx.rect(
+          x,
+          0 - this.personY,
+          this.commonW,
+          personH
+        )
+        this.ctx.lineWidth = 2
+        this.ctx.stroke()
+        this.ctx.restore()
+
+        // person jump
+        const y = 3 * this.commonH
+        const moveY = (y - this.personY) / 10 + 1
+        if (this.operate.jump) {
+          this.personY === 0 && (this.moveUp = true)
+          if (this.moveUp) {
+            this.personY < y ? this.personY += moveY : this.moveUp = false
+          } else {
+            const lastY = this.personY - moveY
+            this.personY = lastY > 0 ? lastY : 0
+            this.operate.jump = !!(lastY > 0)
+            // !(lastY > 0) && (this.traverse = 0)
+          }
+        }
+      }
+
+      randomUnderLines(randomNumber, addPositionX = 0) {
+        for (let i = 0; i <= randomNumber; i++) {
+          const w = Math.round(Math.random() * 5) + 1
+          this.roadUnderLines.push({
+            length: this.commonW * (Math.round(Math.random() * 6) + 1) / 2,
+            width: w,
+            positionX: Math.round(Math.random() * this.innerWidth) - w + addPositionX,
+            positionY: this.roadSurface + Math.random() * (this.innerHeight - this.roadSurface),
+            startTime: +new Date(),
+          })
+        }
+      }
+
+      randomObstacle(randomNumber) {
+        for (let i = 0; i <= randomNumber; i++) {
+          const isFly = !!(Math.random() > 0.5)
+          const h = Math.round(0.8 * this.commonH * (Math.round(Math.random() * 2) + 1))
+          const w = Math.round(0.2 * this.commonW * (Math.round(Math.random() * 5) + 1))
+          const last = this.obstacles[this.obstacles.length - 1]
+          const movingDistance = last ? this.innerWidth / (this.moveTime * 1000) * (+new Date() - last.startTime) : 0
+          const lastPositionX = last ? last.positionX - movingDistance + last.width : this.innerWidth
+          this.obstacles.push({
+            height: h,
+            width: w,
+            positionX: Math.round(Math.random() * this.innerWidth) / 2 + lastPositionX + 3 * this.commonW,
+            positionY: isFly ? -(Math.round(Math.random()) + 0.5) * this.commonH : 0,
+            startTime: +new Date(),
+            isFly,
+          })
+        }
+      }
+    }
+
+    new CanvasA()
+  </script>
+</body>
+
+</html>
