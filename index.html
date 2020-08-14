@@ -270,9 +270,9 @@
         // head
         this.ctx.beginPath()
         this.ctx.arc(
-          x + this.commonW / 4 * 3 - this.commonW / 16,
+          x + this.commonW / 4 * 3 - this.commonW / 32 * 3,
           0 - this.personY + personH - (- this.commonH / 4),
-          this.commonW / 4,
+          this.commonW / 6,
           0,
           2 * Math.PI
         )
@@ -284,6 +284,15 @@
         this.ctx.lineJoin = 'round'
         const bodyStartX = x + this.commonW / 4 * 2
         const bodyStartY = 0 - this.personY + personH - (- this.commonH / 2) - this.commonH / 8
+        // neck
+        this.ctx.beginPath()
+        this.ctx.moveTo(bodyStartX, bodyStartY)
+        this.ctx.lineTo(
+          bodyStartX + this.commonW / 8,
+          bodyStartY - this.commonH / 8
+        )
+        this.ctx.stroke()
+
         this.operate.squat
           ? this.bodyIsSquat(x, y, bodyStartX, bodyStartY, personH)
           : this.bodyIsNotSquat(x, y, bodyStartX, bodyStartY, personH)
