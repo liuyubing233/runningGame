@@ -5,90 +5,152 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Document</title>
+  <style>
+    body {
+      margin: 0;
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      overflow: auto;
+    }
+
+    #canvas {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+  </style>
 </head>
 
-<body style="margin: 0; width: 100vw; height: 100vh;">
+<body>
   <canvas id="canvas"></canvas>
   <script type="text/javascript">
     class CanvasA {
       ctx = undefined
-      innerWidth = innerWidth
-      innerHeight = innerHeight
-      moveTime = 3 // move time
-      moveSpeed = 3
-      commonW = innerWidth / 10
-      commonH = innerHeight / 10
-      roadSurface = innerHeight * 0.8 // road position
-      // let startTime = 0 // start time
+      innerW = 1000
+      innerH = 600
+      completeTime = 3 // complete move time, right to left , 3s
+      moveSpeed = 6
+      commonW = 0
+      commonH = 0
+      roadSurface = 0 // road position
       roadUnderLines = [] // lines about under the road
       obstacles = []
-
       personX = 0
       personY = 0
-
       operate = {
         jump: false,
         squat: false,
         left: false,
         right: false,
       }
-      moveUp = false // is moving up
+      isMoveUp = false // is moving up
+      isPause = true
+      isStart = false
       // this.traverse = 0 // left: -1, right: 1, noMove: 0
+      startTime = 0 // start time
+      pauseTime = 0 // pause time
+      gameDuration = 0 // play game time
+      pauseDuration = 0
+
+      legFunctions = {
+        0: this.leg0,
+        1: this.leg1,
+        2: this.leg2,
+        3: this.leg3,
+        4: this.leg4,
+        5: this.leg5,
+        6: this.leg6,
+        7: this.leg7,
+      }
+
+      legLeft = 1
+      legRight = 4
 
       constructor() {
-        const { innerWidth, innerHeight } = window
         const NodeCanvas = document.querySelector('#canvas')
-        NodeCanvas.width = innerWidth
-        NodeCanvas.height = innerHeight
+        NodeCanvas.width = this.innerW
+        NodeCanvas.height = this.innerH
+        this.commonW = this.innerH / 10
+        this.commonH = this.innerH / 10
+        this.roadSurface = this.innerH * 0.8 // road position
         this.ctx = NodeCanvas.getContext('2d')
-
-        document.addEventListener('keydown', (e) => {
-          const KEY_DOWN = {
-            38: () => this.operate.jump = true,
-            40: () => this.operate.squat = true,
-            37: () => {
-              this.operate.left = true
-              // !this.operate.jump && (this.traverse = -1)
-            },
-            39: () => {
-              this.operate.right = true
-              // !this.operate.jump && (this.traverse = 1)
-            },
-            32: 'space',
-          }
-          KEY_DOWN[e.keyCode] && KEY_DOWN[e.keyCode].call(this)
-        })
-
-        document.addEventListener('keyup', (e) => {
-          const KEY_UP = {
-            // 38: () => this.operate.jump = false,
-            40: () => this.operate.squat = false,
-            37: () => this.operate.left = false,
-            39: () => this.operate.right = false,
-            32: 'space',
-          }
-          KEY_UP[e.keyCode] && KEY_UP[e.keyCode].call(this)
-        })
         this.init()
       }
 
       init() {
-        // startTime = +new Date()
+        this.startTime = +new Date()
+        // this.pauseTime = +new Date()
         this.roadUnderLines = []
         this.obstacles = []
         this.randomUnderLines(Math.round(Math.random() * 5) + 1, 0)
         this.randomObstacle(Math.round(Math.random() * 3) + 1)
-        console.log(this.obstacles)
-
         this.draw()
+
+        document.addEventListener('keydown', (e) => this.keydownFun(e))
+        document.addEventListener('keyup', (e) => this.keyupFun(e))
+      }
+
+      keydownFun(e) {
+        const KEY_DOWN = {
+          38: () => this.operate.jump = true,
+          40: () => this.operate.squat = true,
+          37: () => {
+            this.operate.left = true
+            // !this.operate.jump && (this.traverse = -1)
+          },
+          39: () => {
+            this.operate.right = true
+            // !this.operate.jump && (this.traverse = 1)
+          },
+          32: this.keydownSpace
+        }
+        KEY_DOWN[e.keyCode] && KEY_DOWN[e.keyCode].call(this)
+      }
+
+      keyupFun(e) {
+        const KEY_UP = {
+          // 38: () => this.operate.jump = false,
+          40: () => this.operate.squat = false,
+          37: () => this.operate.left = false,
+          39: () => this.operate.right = false,
+          // 32: 'space',
+        }
+        KEY_UP[e.keyCode] && KEY_UP[e.keyCode].call(this)
+      }
+
+      keydownSpace() {
+        !this.isStart && (this.isStart = true)
+        if (this.isPause) {
+          this.isPause = false
+          this.pauseDuration = this.pauseTime === 0 ? 0 : this.pauseDuration + (+new Date()) - this.pauseTime
+          this.draw()
+        } else {
+          this.isPause = true
+          this.pauseTime = +new Date()
+        }
+      }
+
+      draw() {
+        // pauseStart is after pause and continue the game
+        this.ctx.clearRect(0, 0, this.innerW, this.innerH)
+        this.drawRoad()
+        this.drawPeople()
+        this.drawObstacle()
+        this.drawBgLine()
+        if (this.isStart) {
+          this.gameDuration = +new Date() - this.startTime - this.pauseDuration
+          !this.isPause && requestAnimationFrame(() => this.draw())
+        }
       }
 
       // background line delete last
       drawBgLine() {
-        for (let i = 1; i <= 9; i++) {
+        for (let i = 1; i <= Math.round(this.innerW / this.commonW); i++) {
           this.ctx.beginPath()
-          this.ctx.moveTo((this.innerWidth / 10) * i, 0)
-          this.ctx.lineTo((this.innerWidth / 10) * i, this.innerHeight)
+          this.ctx.moveTo(this.commonW * i, 0)
+          this.ctx.lineTo(this.commonW * i, this.innerH)
           this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)'
           this.ctx.lineWidth = 1
           this.ctx.stroke()
@@ -96,8 +158,8 @@
 
         for (let i = 1; i <= 9; i++) {
           this.ctx.beginPath()
-          this.ctx.moveTo(0, (this.innerHeight / 10) * i)
-          this.ctx.lineTo(this.innerWidth, (this.innerHeight / 10) * i)
+          this.ctx.moveTo(0, this.commonH * i)
+          this.ctx.lineTo(this.innerW, this.commonH * i)
           this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)'
           this.ctx.lineWidth = 1
           this.ctx.stroke()
@@ -107,41 +169,31 @@
       drawRoad() {
         this.ctx.beginPath()
         this.ctx.moveTo(0, this.roadSurface)
-        this.ctx.lineTo(this.innerWidth, this.roadSurface)
-        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)'
+        this.ctx.lineTo(this.innerW, this.roadSurface)
+        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)'
         this.ctx.lineWidth = 10
         this.ctx.stroke()
         this.roadUnderLines.forEach((item, index) => {
-          const movingDistance = this.innerWidth / (this.moveTime * 1000) * (+new Date() - item.startTime)
+          const movingDistance = this.innerW / (this.completeTime * 1000) * (+new Date() - item.startTime - this.pauseDuration + item.nowPauseDuration)
           if (item.positionX + item.length - movingDistance < 0) {
             this.roadUnderLines.splice(index, 1)
           } else {
             this.ctx.beginPath()
             this.ctx.moveTo(item.positionX - movingDistance, item.positionY)
             this.ctx.lineTo(item.positionX + item.length - movingDistance, item.positionY)
-            this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)'
+            this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)'
             this.ctx.lineWidth = item.width
             this.ctx.stroke()
           }
         })
-        this.roadUnderLines.length < 3 && this.randomUnderLines(Math.round(Math.random() * 2) + 1, this.innerWidth)
-      }
-
-      draw() {
-        this.ctx.clearRect(0, 0, innerWidth, innerHeight)
-        // ctx.save()
-        this.drawBgLine()
-        this.drawRoad()
-        this.drawPeople()
-        this.drawObstacle()
-        requestAnimationFrame(() => this.draw())
+        this.roadUnderLines.length < 3 && this.randomUnderLines(Math.round(Math.random() * 2) + 1, this.innerW)
       }
 
       drawObstacle() {
         this.ctx.save()
         this.ctx.translate(0, this.roadSurface)
         this.obstacles.forEach((item, index) => {
-          const movingDistance = this.innerWidth / (this.moveTime * 1000) * (+new Date() - item.startTime)
+          const movingDistance = this.innerW / (this.completeTime * 1000) * (+new Date() - item.startTime - this.pauseDuration + item.nowPauseDuration)
           if (item.positionX + item.width - movingDistance < 0) {
             this.obstacles.splice(index, 1)
           } else {
@@ -154,13 +206,12 @@
             )
             this.ctx.fillStyle = 'black'
             this.ctx.fill()
-
           }
         })
         this.ctx.restore()
         this.obstacles.filter(i => {
-          const movingDistance = this.innerWidth / (this.moveTime * 1000) * (+new Date() - i.startTime)
-          return i.positionX - movingDistance + i.width > this.innerWidth
+          const movingDistance = this.innerW / (this.completeTime * 1000) * (+new Date() - i.startTime - this.pauseDuration + i.nowPauseDuration)
+          return i.positionX - movingDistance + i.width > this.innerW
         }).length < 2 && this.randomObstacle(1)
       }
 
@@ -174,21 +225,37 @@
         //     ? (this.traverse < 0 ? (-this.moveSpeed) : this.traverse > 0 ? this.moveSpeed : 0)
         //     : (this.operate.left ? (-this.moveSpeed) : this.operate.right ? this.moveSpeed : 0))
 
+        // can move when jumping
         const perX = this.personX + (this.operate.left ? (-this.moveSpeed) : this.operate.right ? this.moveSpeed : 0)
         let x = this.commonW + perX
         // person left or right position is reach the border
-        if (x > 0 && x < this.innerWidth - this.commonW) {
+        if (x > 0 && x < this.innerW - this.commonW) {
           this.personX = perX
         } else if (x <= 0) {
           x = 0
           this.personX = -this.commonW
-        } else if (x >= this.innerWidth - this.commonW) {
-          x = this.innerWidth - this.commonW
-          this.personX = this.innerWidth - 2 * this.commonW
+        } else if (x >= this.innerW - this.commonW) {
+          x = this.innerW - this.commonW
+          this.personX = this.innerW - 2 * this.commonW
         }
 
-        // person use box temporarily
+        // person jump
+        const y = 3 * this.commonH
+        const moveY = (y - this.personY) / 10 + 1
+        if (this.operate.jump) {
+          this.personY === 0 && (this.isMoveUp = true)
+          if (this.isMoveUp) {
+            this.personY < y ? this.personY += moveY : this.isMoveUp = false
+          } else {
+            const lastY = this.personY - moveY
+            this.personY = lastY > 0 ? lastY : 0
+            this.operate.jump = !!(lastY > 0)
+            // !(lastY > 0) && (this.traverse = 0)
+          }
+        }
+
         this.ctx.save()
+        // person use box temporarily
         this.ctx.translate(0, this.roadSurface)
         this.ctx.beginPath()
         this.ctx.rect(
@@ -199,22 +266,235 @@
         )
         this.ctx.lineWidth = 2
         this.ctx.stroke()
-        this.ctx.restore()
 
-        // person jump
-        const y = 3 * this.commonH
-        const moveY = (y - this.personY) / 10 + 1
+        // head
+        this.ctx.beginPath()
+        this.ctx.arc(
+          x + this.commonW / 4 * 3 - this.commonW / 16,
+          0 - this.personY + personH - (- this.commonH / 4),
+          this.commonW / 4,
+          0,
+          2 * Math.PI
+        )
+        this.ctx.fillStyle = "#000"
+        this.ctx.fill()
+        this.ctx.lineWidth = 5
+        this.ctx.strokeStyle = '#000'
+        this.ctx.lineCap = 'round'
+        this.ctx.lineJoin = 'round'
+        const bodyStartX = x + this.commonW / 4 * 2
+        const bodyStartY = 0 - this.personY + personH - (- this.commonH / 2) - this.commonH / 8
+        this.operate.squat
+          ? this.bodyIsSquat(x, y, bodyStartX, bodyStartY, personH)
+          : this.bodyIsNotSquat(x, y, bodyStartX, bodyStartY, personH)
+        this.ctx.restore()
+        // do impact checking
+        this.impactChecking({
+          x,
+          y: 0 - this.personY,
+          w: this.commonW,
+          h: personH
+        })
+      }
+
+      bodyIsSquat(x, y, bodyStartX, bodyStartY, personH) {
+        // body
+        this.ctx.beginPath()
+        this.ctx.moveTo(bodyStartX, bodyStartY)
+        this.ctx.lineTo(
+          x + this.commonW / 4,
+          0 - this.personY + personH - (- this.commonH / 2),
+        )
+        this.ctx.stroke()
+
+        const legStartX = x + this.commonW / 4
+        const legStartY = 0 - this.personY + personH - (- this.commonH / 2)
+        // legs
+        this.ctx.beginPath()
+        this.ctx.moveTo(legStartX, legStartY)
+        this.ctx.lineTo(
+          legStartX + this.commonW / 5 * 2,
+          legStartY + this.commonH / 4
+        )
+        this.ctx.lineTo(
+          legStartX - this.commonW / 16,
+          legStartY + this.commonH / 2 - this.commonH / 8
+        )
+        this.ctx.lineTo(
+          legStartX,
+          legStartY + this.commonH / 2
+        )
+        this.ctx.stroke()
+
+        this.ctx.beginPath()
+        this.ctx.moveTo(legStartX, legStartY)
+        this.ctx.lineTo(
+          legStartX + this.commonW / 5 * 2,
+          legStartY + this.commonH / 4
+        )
+        this.ctx.lineTo(
+          legStartX + this.commonW / 16,
+          legStartY + this.commonH / 2 - this.commonH / 8
+        )
+        this.ctx.lineTo(
+          legStartX + this.commonW / 16 * 2,
+          legStartY + this.commonH / 2
+        )
+        this.ctx.stroke()
+
+        // arms
+        this.ctx.beginPath()
+        this.ctx.moveTo(bodyStartX, bodyStartY)
+        this.ctx.lineTo(
+          legStartX,
+          bodyStartY - this.commonH / 4
+        )
+        this.ctx.lineTo(legStartX, legStartY)
+        this.ctx.stroke()
+      }
+
+      bodyIsNotSquat(x, y, bodyStartX, bodyStartY, personH) {
+        // body
+        this.ctx.beginPath()
+        this.ctx.moveTo(
+          bodyStartX,
+          bodyStartY,
+        )
+        this.ctx.lineTo(
+          x + this.commonW / 2,
+          0 - this.personY + personH - (- this.commonH),
+        )
+        this.ctx.stroke()
+
+        const legStartX = x + this.commonW / 2
+        const legStartY = 0 - this.personY + personH - (- this.commonH)
+
+        // legs
         if (this.operate.jump) {
-          this.personY === 0 && (this.moveUp = true)
-          if (this.moveUp) {
-            this.personY < y ? this.personY += moveY : this.moveUp = false
-          } else {
-            const lastY = this.personY - moveY
-            this.personY = lastY > 0 ? lastY : 0
-            this.operate.jump = !!(lastY > 0)
-            // !(lastY > 0) && (this.traverse = 0)
+          this.leg0(legStartX, legStartY)
+          this.leg3(legStartX, legStartY)
+        } else {
+          this.legFunctions[this.legLeft].call(this, legStartX, legStartY)
+          this.legFunctions[this.legRight].call(this, legStartX, legStartY)
+          this.legLeft = Math.floor((this.gameDuration / 100) % 8)
+          this.legRight = Math.floor(((this.gameDuration / 100) + 4) % 8)
+        }
+
+        // arms
+        this.ctx.beginPath()
+        this.ctx.moveTo(bodyStartX, bodyStartY)
+        this.ctx.lineTo(
+          x + this.commonW / 4 * 1,
+          0 - this.personY + personH - (- this.commonH) / 4 * 3,
+        )
+        this.ctx.lineTo(
+          x + this.commonW / 2,
+          0 - this.personY + personH - (- this.commonH),
+        )
+        this.ctx.stroke()
+      }
+
+      leg0(x, y) {
+        const { commonH, commonW } = this
+        this.ctx.beginPath()
+        this.ctx.moveTo(x, y)
+        this.ctx.lineTo(x + commonW / 4, y - (-commonH / 3))
+        this.ctx.lineTo(x + (commonW / 8) * 3, y - (-commonH))
+        this.ctx.lineTo(x + (commonW / 8) * 3 + commonW / 8, y - (-commonH))
+        this.ctx.stroke()
+      }
+
+      leg1(x, y) {
+        const { commonH, commonW } = this
+        this.ctx.beginPath()
+        this.ctx.moveTo(x, y)
+        this.ctx.lineTo(x + commonW / 8, y - (-commonH / 5) * 2)
+        this.ctx.lineTo(x + (commonW / 16) * 3, y - (-commonH))
+        this.ctx.lineTo(x + (commonW / 16) * 3 + commonW / 8, y - (-commonH))
+        this.ctx.stroke()
+      }
+
+      leg2(x, y) {
+        const { commonH, commonW } = this
+        this.ctx.beginPath()
+        this.ctx.moveTo(x, y)
+        this.ctx.lineTo(x + commonW / 16, y - (-commonH / 2))
+        this.ctx.lineTo(x - (commonW / 8), y - (-commonH))
+        this.ctx.lineTo(x, y - (-commonH))
+        this.ctx.stroke()
+      }
+
+      leg3(x, y) {
+        const { commonH, commonW } = this
+        this.ctx.beginPath()
+        this.ctx.moveTo(x, y)
+        this.ctx.lineTo(x - commonW / 16, y - (-commonH / 5) * 2)
+        this.ctx.lineTo(x - (commonW / 8) * 3, y - (-commonH / 8) * 7)
+        this.ctx.lineTo(x - (commonW / 8) * 3, y - (-commonH))
+        this.ctx.stroke()
+      }
+
+      leg4(x, y) {
+        const { commonH, commonW } = this
+        this.ctx.beginPath()
+        this.ctx.moveTo(x, y)
+        this.ctx.lineTo(x - commonW / 8, y - (-commonH / 3) * 1)
+        this.ctx.lineTo(x - (commonW / 8) * 4, y - (-commonH / 4) * 1)
+        this.ctx.lineTo(x - (commonW / 8) * 4, y - (-commonH / 8) * 3)
+        this.ctx.stroke()
+      }
+
+      leg5(x, y) {
+        const { commonH, commonW } = this
+        this.ctx.beginPath()
+        this.ctx.moveTo(x, y)
+        this.ctx.lineTo(x + commonW / 4, y - (-commonH / 4) * 1)
+        this.ctx.lineTo(x + commonW / 4 - (commonW / 2), y - (-commonH / 4) * 1)
+        this.ctx.lineTo(x + commonW / 4 - (commonW / 3) * 2, y - (-commonH / 8) * 3)
+        this.ctx.stroke()
+      }
+
+      leg6(x, y) {
+        const { commonH, commonW } = this
+        this.ctx.beginPath()
+        this.ctx.moveTo(x, y)
+        this.ctx.lineTo(x + (commonW / 16) * 6, y - (-commonH / 8) * 1)
+        this.ctx.lineTo(x, y - (-commonH / 2) * 1)
+        this.ctx.lineTo(x + commonW / 8, y - (-commonH / 8) * 5)
+        this.ctx.stroke()
+      }
+
+      leg7(x, y) {
+        const { commonH, commonW } = this
+        this.ctx.beginPath()
+        this.ctx.moveTo(x, y)
+        this.ctx.lineTo(x + (commonW / 8) * 3, y - (-commonH / 3))
+        this.ctx.lineTo(x + (commonW / 8) * 3, y - (-commonH))
+        this.ctx.lineTo(x + (commonW / 8) * 3 + commonW / 8, y - (-commonH))
+        this.ctx.stroke()
+      }
+
+      impactChecking(person) {
+        for (let i of this.obstacles) {
+          const movingDistance = this.innerW / (this.completeTime * 1000) * (+new Date() - i.startTime - this.pauseDuration + i.nowPauseDuration)
+          const obstacle = {
+            iX: i.positionX - movingDistance,
+            iY: i.positionY,
+            iW: i.width,
+            iH: -i.height,
+          }
+          if (this.impactCheckingVerity(person, obstacle)) {
+            console.log('is check')
           }
         }
+      }
+
+      impactCheckingVerity(person, obstacle) {
+        const { x, y, w, h } = person
+        const { iX, iY, iW, iH } = obstacle
+        // because y and h is negative number
+        // so compare use negate
+        return x + w >= iX && x <= iX + iW && y + h <= iY && y >= iY + iH
       }
 
       randomUnderLines(randomNumber, addPositionX = 0) {
@@ -223,8 +503,9 @@
           this.roadUnderLines.push({
             length: this.commonW * (Math.round(Math.random() * 6) + 1) / 2,
             width: w,
-            positionX: Math.round(Math.random() * this.innerWidth) - w + addPositionX,
-            positionY: this.roadSurface + Math.random() * (this.innerHeight - this.roadSurface),
+            positionX: Math.round(Math.random() * this.innerW) - w + addPositionX,
+            positionY: this.roadSurface + Math.random() * (this.innerH - this.roadSurface),
+            nowPauseDuration: this.pauseDuration,
             startTime: +new Date(),
           })
         }
@@ -233,21 +514,25 @@
       randomObstacle(randomNumber) {
         for (let i = 0; i <= randomNumber; i++) {
           const isFly = !!(Math.random() > 0.5)
-          const h = Math.round(0.8 * this.commonH * (Math.round(Math.random() * 2) + 1))
+          const h = Math.round(0.7 * this.commonH * (Math.round(Math.random() * 2) + 1))
           const w = Math.round(0.2 * this.commonW * (Math.round(Math.random() * 5) + 1))
           const last = this.obstacles[this.obstacles.length - 1]
-          const movingDistance = last ? this.innerWidth / (this.moveTime * 1000) * (+new Date() - last.startTime) : 0
-          const lastPositionX = last ? last.positionX - movingDistance + last.width : this.innerWidth
+          const movingDistance = last
+            ? this.innerW / (this.completeTime * 1000) * (+new Date() - last.startTime - this.pauseDuration + last.nowPauseDuration)
+            : 0
+          const lastPositionX = last ? last.positionX - movingDistance + last.width : this.innerW
           this.obstacles.push({
             height: h,
             width: w,
-            positionX: Math.round(Math.random() * this.innerWidth) / 2 + lastPositionX + 3 * this.commonW,
+            positionX: Math.round(Math.random() * this.innerW) / 2 + lastPositionX + 3 * this.commonW,
             positionY: isFly ? -(Math.round(Math.random()) + 0.5) * this.commonH : 0,
             startTime: +new Date(),
+            nowPauseDuration: this.pauseDuration,
             isFly,
           })
         }
       }
+
     }
 
     new CanvasA()
