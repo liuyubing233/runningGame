@@ -33,6 +33,7 @@
       commonW = 0           // 单位宽度
       commonH = 0           // 单位高度
       roadSurface = 0       // 路面位置
+
       roadUnderLines = []   // 路面底部线条数组
       obstacles = []        // 障碍物数组
       peopleX = 0           // 人物坐标x
@@ -54,14 +55,18 @@
       pauseTime = 0           // 暂停时间
       gameDuration = 0        // 游戏时长
       pauseDuration = 0       // 暂停时长
+      numberOfRuns = 0        // 过的帧数
+      numberOfGame = 0        // 分数
 
-      numberOfRuns = 0
+      peopleHead = { x: 0, y: 0, z: 0 } // 人物脑袋用于碰撞检测
+      peoplePoints = []                 // 人物身上取点用于碰撞检测
 
       colorFloor = '#111f2c'        // 地面颜色
       colorObstacle = '#111f2c'     // 障碍物颜色
       colorPeople = '#111f2c'       // 人物颜色
       colorDevelopBox = '#aaaaaa'   // 开发线颜色
       colorBackground = '#ffffff'   // 背景颜色
+      colorDevelopPoint = '#ff0000' // 开发点颜色
 
       legLeft = 1   // 左
       legRight = 4  // 右
@@ -78,15 +83,19 @@
       }
 
       init() {
-        this.startTime = +new Date()
-        this.pauseTime = +new Date()
-        this.roadUnderLines = []
-        this.obstacles = []
-        this.randomUnderLines(Math.round(Math.random() * 5) + 1, 0)
-        this.randomObstacle(Math.round(Math.random() * 3) + 1)
+        this.initParam()
         this.draw()
         document.addEventListener('keydown', (e) => this.keydownFun(e))
         document.addEventListener('keyup', (e) => this.keyupFun(e))
+
+        this.ctx.lineWidth = 6
+        this.ctx.font = `${this.commonW * 2}px heiti`
+        this.ctx.strokeText('AWESOME MAN', this.commonW * 0.5, this.commonH * 3)
+
+        this.ctx.lineWidth = 1
+        this.ctx.fillStyle = this.colorObstacle
+        this.ctx.font = `${this.commonW / 2}px heiti`
+        this.ctx.fillText('Click the space to start the game', this.commonW * 4, this.commonH * 4)
       }
 
       keydownFun(e) {
@@ -137,10 +146,24 @@
         this.drawRoad()
         this.drawObstacle()
         this.drawPeople()
+        this.numberOfRuns++
+        this.drawScoreboard()
         if (this.isStart) {
           this.gameDuration = +new Date() - this.startTime - this.pauseDuration
           !this.isPause && requestAnimationFrame(() => this.draw())
         }
+      }
+
+      // 计分板
+      drawScoreboard() {
+        this.ctx.lineWidth = 1
+        this.ctx.fillStyle = this.colorObstacle
+        this.ctx.font = `${this.commonW / 4}px heiti`
+        this.ctx.fillText(
+          `Time: ${Math.floor(this.gameDuration / 1000)}s    Score: ${this.numberOfGame}`,
+          this.commonW * 11,
+          this.commonH,
+        )
       }
 
       // background line
@@ -190,12 +213,13 @@
       }
 
       obstacleItemDraw(item, movingDistance) {
-        const { width, height, positionX, positionY, type } = item
+        const { width, height, positionX, positionY, type, centerX } = item
         const poX = positionX - movingDistance
         if (this.isDevelopment) {
           this.ctx.lineWidth = 2
           this.ctx.strokeStyle = this.colorDevelopBox
           this.funStrokeRect(poX, positionY, width, -height)
+          this.funLines([centerX - movingDistance, 0], [centerX - movingDistance, -this.innerH])
         }
 
         // 轮廓
@@ -271,6 +295,7 @@
         const eyesY = positionY - height + width / 2 + height / 9
         this.funStrokeRect(poX, positionY, width, -height)
         // 单眼
+        this.ctx.fillStyle = this.colorObstacle
         this.funStrokeCircle(poX + width / 2, eyesY, (width - 8) / 2)
         this.funFillCircle(poX + width / 2, eyesY, (width - 8) / 5)
         // 眉
@@ -390,34 +415,47 @@
         this.ctx.lineJoin = 'round'
         const bodyStartX = x + this.commonW / 4 * 2
         const bodyStartY = 0 - this.peopleY + peopleH - (- this.commonH / 2) - this.commonH / 8
-        // neck
+        // 将脑袋坐标和半径输入
+        this.peopleHead = {
+          x: x + this.commonW / 4 * 3 - this.commonW / 32 * 3,
+          y: 0 - this.peopleY + peopleH - (- this.commonH / 4),
+          r: this.commonW / 6
+        }
+        // 清空人物取点
+        this.peoplePoints = []
+        // 脖子
         this.funLines(
           [bodyStartX, bodyStartY],
           [bodyStartX + this.commonW / 8, bodyStartY - this.commonH / 8]
         )
-        // legs
+        // 人物是否蹲下
         this.operate.squat
           ? this.bodyIsSquat(x, y, bodyStartX, bodyStartY, peopleH)
           : this.bodyIsNotSquat(x, y, bodyStartX, bodyStartY, peopleH)
         this.ctx.restore()
-        // do impact checking
-        this.impactChecking({
-          x,
-          y: 0 - this.peopleY,
-          w: this.commonW,
-          h: peopleH
-        })
+        if (this.isDevelopment) {
+          // 开发模式 人物身上取的点
+          this.ctx.fillStyle = this.colorDevelopPoint
+          this.ctx.save()
+          this.ctx.translate(0, this.roadSurface)
+          this.peoplePoints.forEach((item) => {
+            this.funFillCircle(item[0], item[1], 2)
+          })
+          // this.ctx.fillStyle = this.colorObstacle
+          this.ctx.restore()
+        }
+        this.impactChecking()
       }
 
       // 人物蹲
       bodyIsSquat(x, y, bodyStartX, bodyStartY, peopleH) {
+        const legStartX = x + this.commonW / 4
+        const legStartY = 0 - this.peopleY + peopleH - (- this.commonH / 2)
         // body
         this.funLines(
           [bodyStartX, bodyStartY],
-          [x + this.commonW / 4, 0 - this.peopleY + peopleH - (- this.commonH / 2),]
+          [legStartX, legStartY]
         )
-        const legStartX = x + this.commonW / 4
-        const legStartY = 0 - this.peopleY + peopleH - (- this.commonH / 2)
         // legs
         this.funLines(
           [legStartX, legStartY],
@@ -437,18 +475,27 @@
           [legStartX, bodyStartY - this.commonH / 4],
           [legStartX, legStartY],
         )
+        // 腿部起始点、双脚、膝盖、和、胳膊肘
+        this.peoplePoints = [
+          [legStartX, legStartY],
+          [legStartX + this.commonW / 5 * 2, legStartY + this.commonH / 4],
+          [legStartX, legStartY + this.commonH / 2],
+          [legStartX + this.commonW / 16 * 2, legStartY + this.commonH / 2],
+          [legStartX, bodyStartY - this.commonH / 4]
+        ]
       }
 
       // 人物正常身形
       bodyIsNotSquat(x, y, bodyStartX, bodyStartY, peopleH) {
         // body
-        this.funLines(
-          [bodyStartX, bodyStartY],
-          [x + this.commonW / 2, 0 - this.peopleY + peopleH - (- this.commonH)]
-        )
-
         const legStartX = x + this.commonW / 2
         const legStartY = 0 - this.peopleY + peopleH - (- this.commonH)
+        this.funLines(
+          [bodyStartX, bodyStartY],
+          [legStartX, legStartY]
+        )
+        // 人物腿部起始点
+        this.peoplePoints.push([legStartX, legStartY])
 
         // legs
         if (this.operate.jump) {
@@ -465,7 +512,6 @@
             6: this.leg6,
             7: this.leg7,
           }
-
           legFunctions[this.legLeft].call(this, legStartX, legStartY)
           legFunctions[this.legRight].call(this, legStartX, legStartY)
           this.legLeft = Math.floor((this.gameDuration / 100) % 8)
@@ -478,31 +524,67 @@
           [x + this.commonW / 4 * 1, 0 - this.peopleY + peopleH - (- this.commonH) / 4 * 3],
           [x + this.commonW / 2, 0 - this.peopleY + peopleH - (- this.commonH)],
         )
+        // 胳膊肘的点
+        this.peoplePoints.push([x + this.commonW / 4 * 1, 0 - this.peopleY + peopleH - (- this.commonH) / 4 * 3])
       }
 
       // 碰撞检测
       impactChecking(people) {
-        const { x, y, w, h } = people
-        for (let i of this.obstacles) {
-          const movingDistance = this.getMovingDistance(i)
+        // 人物中心点
+        const pCenter = this.peoplePoints[0]
+        // 取第一个没有通过的障碍物做碰撞检测
+        const noPassed = this.obstacles.filter(i => !i.isPassed)
+        if (noPassed && noPassed.length) {
+          const next = noPassed[0]
           const obstacle = {
-            iX: i.positionX - movingDistance,
-            iY: i.positionY,
-            iW: i.width,
-            iH: -i.height,
+            x: next.positionX - this.getMovingDistance(next),
+            y: next.positionY,
+            w: next.width,
+            h: next.height,
           }
-          if (this.impactCheckingVerity(people, obstacle)) {
-            console.log('is check')
+          // console.log(obstacle, this.peopleHead)
+          if (this.impactCheckingVerity(obstacle)) {
+            this.gameOver()
+            return
+          }
+          if (pCenter[0] >= next.centerX - this.getMovingDistance(next)) {
+            next.isPassed = true
+            this.numberOfGame = this.numberOfGame + 1
           }
         }
       }
 
-      impactCheckingVerity(people, obstacle) {
-        const { x, y, w, h } = people
-        const { iX, iY, iW, iH } = obstacle
-        // because y and h is negative number
-        // so compare use negate
-        return x + w >= iX && x <= iX + iW && y + h <= iY && y >= iY + iH
+      impactCheckingVerity({ x, y, w, h }) {
+        // 判断人物像素点是否碰撞
+        for (let i of this.peoplePoints) {
+          const iX = i[0]
+          const iY = i[1]
+          // 因为iy和y都为负值，所以取反
+          if (iX >= x && iX <= x + w && -iY >= -y && -iY <= -y + h) {
+            return true
+          }
+        }
+        // 判断障碍物的四条边到圆心的距离是否有小于半径
+        // 有小于半径则为碰撞
+        // cY和y为负值 取反
+        const cX = this.peopleHead.x
+        const cY = this.peopleHead.y
+        const cR = this.peopleHead.r
+        return !(cX + cR < x || cX - cR > x + w || -cY + cR < -y || -cY - cR > -y + h)
+      }
+
+      gameOver() {
+        console.log('is check')
+        this.initParam()
+
+        this.ctx.lineWidth = 6
+        this.ctx.font = `${this.commonW * 2}px heiti`
+        this.ctx.strokeText('GAME OVER', this.commonW * 2.5, this.commonH * 3)
+
+        this.ctx.lineWidth = 1
+        this.ctx.fillStyle = this.colorObstacle
+        this.ctx.font = `${this.commonW / 2}px heiti`
+        this.ctx.fillText('Click the space to restart the game', this.commonW * 4, this.commonH * 4)
       }
 
       randomUnderLines(randomNumber, addPositionX = 0) {
@@ -546,7 +628,7 @@
             startTime: +new Date(), // 创建时间
             nowPauseDuration: this.pauseDuration, // 当前暂停时间
             isPassed: false, // 是否通过
-            centerX: width + positionX / 2, // 中心点X坐标
+            centerX: positionX + width / 2, // 中心点X坐标
             type, // 类型
             left: !!(Math.random() > 0.5),
             right: !!(Math.random() > 0.5),
@@ -603,6 +685,10 @@
           [x + (commonW / 8) * 3, y - (-commonH)],
           [x + (commonW / 8) * 3 + commonW / 8, y - (-commonH)]
         )
+        this.peoplePoints.push(
+          [x + commonW / 4, y - (-commonH / 3)],
+          [x + (commonW / 8) * 3 + commonW / 8, y - (-commonH)]
+        )
       }
 
       leg1(x, y) {
@@ -612,6 +698,10 @@
           [x + commonW / 8, y - (-commonH / 5) * 2],
           [x + (commonW / 16) * 3, y - (-commonH)],
           [x + (commonW / 16) * 3 + commonW / 8, y - (-commonH)],
+        )
+        this.peoplePoints.push(
+          [x + commonW / 8, y - (-commonH / 5) * 2],
+          [x + (commonW / 16) * 3 + commonW / 8, y - (-commonH)]
         )
       }
 
@@ -623,6 +713,10 @@
           [x - (commonW / 8), y - (-commonH)],
           [x, y - (-commonH)],
         )
+        this.peoplePoints.push(
+          [x + commonW / 16, y - (-commonH / 2)],
+          [x, y - (-commonH)]
+        )
       }
 
       leg3(x, y) {
@@ -632,6 +726,10 @@
           [x - commonW / 16, y - (-commonH / 5) * 2],
           [x - (commonW / 8) * 3, y - (-commonH / 8) * 7],
           [x - (commonW / 8) * 3, y - (-commonH)],
+        )
+        this.peoplePoints.push(
+          [x - commonW / 16, y - (-commonH / 5) * 2],
+          [x - (commonW / 8) * 3, y - (-commonH)]
         )
       }
 
@@ -643,6 +741,10 @@
           [x - (commonW / 8) * 4, y - (-commonH / 4) * 1],
           [x - (commonW / 8) * 4, y - (-commonH / 8) * 3],
         )
+        this.peoplePoints.push(
+          [x - commonW / 8, y - (-commonH / 3) * 1],
+          [x - (commonW / 8) * 4, y - (-commonH / 8) * 3]
+        )
       }
 
       leg5(x, y) {
@@ -652,6 +754,10 @@
           [x + commonW / 4, y - (-commonH / 4) * 1],
           [x + commonW / 4 - (commonW / 2), y - (-commonH / 4) * 1],
           [x + commonW / 4 - (commonW / 3) * 2, y - (-commonH / 8) * 3],
+        )
+        this.peoplePoints.push(
+          [x + commonW / 4, y - (-commonH / 4) * 1],
+          [x + commonW / 4 - (commonW / 3) * 2, y - (-commonH / 8) * 3]
         )
       }
 
@@ -663,6 +769,10 @@
           [x, y - (-commonH / 2) * 1],
           [x + commonW / 8, y - (-commonH / 8) * 5],
         )
+        this.peoplePoints.push(
+          [x + (commonW / 16) * 6, y - (-commonH / 8) * 1],
+          [x + commonW / 8, y - (-commonH / 8) * 5]
+        )
       }
 
       leg7(x, y) {
@@ -673,6 +783,40 @@
           [x + (commonW / 8) * 3, y - (-commonH)],
           [x + (commonW / 8) * 3 + commonW / 8, y - (-commonH)],
         )
+        this.peoplePoints.push(
+          [x + (commonW / 8) * 3, y - (-commonH / 3)],
+          [x + (commonW / 8) * 3 + commonW / 8, y - (-commonH)]
+        )
+      }
+
+      // 初始化数据
+      initParam() {
+        this.operate = {
+          jump: false,    // 跳
+          squat: false,   // 蹲
+          left: false,    // 向左
+          right: false,   // 向右
+        }
+        this.isMoveUp = false        // 是否在向上移动
+        // this.this.traverse = 0    // 惯性 left: -1, right: 1, noMove: 0
+        this.numberOfRuns = 0        // 过的帧数
+        this.peopleHead = { x: 0, y: 0, z: 0 } // 人物脑袋用于碰撞检测
+        this.peoplePoints = []                 // 人物身上取点用于碰撞检测
+        this.legLeft = 1   // 左
+        this.legRight = 4  // 右
+        this.isPause = true
+        this.isStart = false
+        this.numberOfGame = 0
+        this.startTime = +new Date()
+        this.pauseTime = +new Date()
+        this.pauseDuration = 0
+        this.gameDuration = 0
+        this.roadUnderLines = []
+        this.obstacles = []
+        this.peopleX = 0           // 人物坐标x
+        this.peopleY = 0           // 人物坐标y
+        this.randomUnderLines(Math.round(Math.random() * 5) + 1, 0)
+        this.randomObstacle(Math.round(Math.random() * 3) + 1)
       }
     }
     new CanvasA()
