@@ -23,6 +23,7 @@
   <script type="text/javascript">
     class CanvasA {
       isDevelopment = true  // 是否开发模式（显示辅助线）
+      canPause = true       // 是否可以暂停
 
       ctx = undefined
       innerW = 1000         // 界面宽度
@@ -56,33 +57,12 @@
 
       numberOfRuns = 0
 
-      colorFloor = '#555555'
-      colorObstacle = '#191919'
-      colorPeople = '#080808'
-      colorDevelopBox = '#aaaaaa'
+      colorFloor = '#111f2c'        // 地面颜色
+      colorObstacle = '#111f2c'     // 障碍物颜色
+      colorPeople = '#111f2c'       // 人物颜色
+      colorDevelopBox = '#aaaaaa'   // 开发线颜色
+      colorBackground = '#ffffff'   // 背景颜色
 
-      // colorChecks = ['#181818']
-
-      // colorFloor = 'rgba(0, 0, 0, 0.75)'        // 地面颜色
-      // colorObstacle = 'rgba(0, 0, 0, 0.99)'     // 障碍物颜色
-      // colorPeople = 'rgba(0, 0, 0, 0.8)'       // 人物颜色
-      // colorDevelopBox = 'rgba(0, 0, 0, 0.4)'    // 开发线颜色
-
-      // colorChecks = ['#181818']                 // 碰撞颜色
-
-      /*
-       * 腿部移动
-       */
-      legFunctions = {
-        0: this.leg0,
-        1: this.leg1,
-        2: this.leg2,
-        3: this.leg3,
-        4: this.leg4,
-        5: this.leg5,
-        6: this.leg6,
-        7: this.leg7,
-      }
       legLeft = 1   // 左
       legRight = 4  // 右
 
@@ -137,24 +117,26 @@
 
       keydownSpace() {
         !this.isStart && (this.isStart = true)
-        if (this.isPause) {
-          this.isPause = false
-          this.pauseDuration = this.pauseTime === 0 ? 0 : this.pauseDuration + (+new Date()) - this.pauseTime
-          this.draw()
-        } else {
-          this.isPause = true
-          this.pauseTime = +new Date()
+        if (this.canPause) {
+          if (this.isPause) {
+            this.isPause = false
+            this.pauseDuration = this.pauseTime === 0 ? 0 : this.pauseDuration + (+new Date()) - this.pauseTime
+          } else {
+            this.isPause = true
+            this.pauseTime = +new Date()
+          }
         }
+        this.draw()
       }
 
       draw() {
         // pauseStart is after pause and continue the game
         this.ctx.clearRect(0, 0, this.innerW, this.innerH)
-        this.ctx.globalCompositeOperation = 'darken'
-        this.drawRoad()
-        this.drawPeople()
-        this.drawObstacle()
+        // this.ctx.globalCompositeOperation = 'darken'
         this.drawBgLine()
+        this.drawRoad()
+        this.drawObstacle()
+        this.drawPeople()
         if (this.isStart) {
           this.gameDuration = +new Date() - this.startTime - this.pauseDuration
           !this.isPause && requestAnimationFrame(() => this.draw())
@@ -164,44 +146,31 @@
       // background line
       drawBgLine() {
         if (this.isDevelopment) {
+          this.ctx.strokeStyle = this.colorDevelopBox
+          this.ctx.lineWidth = 1
           for (let i = 1; i <= Math.round(this.innerW / this.commonW); i++) {
-            this.ctx.beginPath()
-            this.ctx.moveTo(this.commonW * i, 0)
-            this.ctx.lineTo(this.commonW * i, this.innerH)
-            this.ctx.strokeStyle = this.colorDevelopBox
-            this.ctx.lineWidth = 1
-            this.ctx.stroke()
+            this.funLines([this.commonW * i, 0], [this.commonW * i, this.innerH])
           }
-
           for (let i = 1; i <= 9; i++) {
-            this.ctx.beginPath()
-            this.ctx.moveTo(0, this.commonH * i)
-            this.ctx.lineTo(this.innerW, this.commonH * i)
-            this.ctx.strokeStyle = this.colorDevelopBox
-            this.ctx.lineWidth = 1
-            this.ctx.stroke()
+            this.funLines([0, this.commonH * i], [this.innerW, this.commonH * i])
           }
         }
       }
 
       drawRoad() {
-        this.ctx.beginPath()
-        this.ctx.moveTo(0, this.roadSurface + 5)
-        this.ctx.lineTo(this.innerW, this.roadSurface + 5)
         this.ctx.strokeStyle = this.colorFloor
         this.ctx.lineWidth = 10
-        this.ctx.stroke()
+        this.funLines([0, this.roadSurface + 5], [this.innerW, this.roadSurface + 5])
         this.roadUnderLines.forEach((item, index) => {
-          const movingDistance = this.innerW / (this.timeToComplete * 1000) * (+new Date() - item.startTime - this.pauseDuration + item.nowPauseDuration)
+          const movingDistance = this.getMovingDistance(item)
           if (item.positionX + item.length - movingDistance < 0) {
             this.roadUnderLines.splice(index, 1)
           } else {
-            this.ctx.beginPath()
-            this.ctx.moveTo(item.positionX - movingDistance, item.positionY)
-            this.ctx.lineTo(item.positionX + item.length - movingDistance, item.positionY)
-            this.ctx.strokeStyle = this.colorFloor
             this.ctx.lineWidth = item.width
-            this.ctx.stroke()
+            this.funLines(
+              [item.positionX - movingDistance, item.positionY],
+              [item.positionX + item.length - movingDistance, item.positionY],
+            )
           }
         })
         this.roadUnderLines.length < 3 && this.randomUnderLines(Math.round(Math.random() * 2) + 1, this.innerW)
@@ -211,26 +180,138 @@
         this.ctx.save()
         this.ctx.translate(0, this.roadSurface)
         this.obstacles.forEach((item, index) => {
-          const movingDistance = this.innerW / (this.timeToComplete * 1000) * (+new Date() - item.startTime - this.pauseDuration + item.nowPauseDuration)
-          if (item.positionX + item.width - movingDistance < 0) {
-            this.obstacles.splice(index, 1)
-          } else {
-            this.ctx.beginPath()
-            this.ctx.rect(
-              item.positionX - movingDistance,
-              item.positionY,
-              item.width,
-              -item.height,
-            )
-            this.ctx.fillStyle = this.colorObstacle
-            this.ctx.fill()
-          }
+          const movingDistance = this.getMovingDistance(item)
+          item.positionX + item.width - movingDistance < 0
+            ? this.obstacles.splice(index, 1)
+            : this.obstacleItemDraw(item, movingDistance)
         })
         this.ctx.restore()
-        this.obstacles.filter(i => {
-          const movingDistance = this.innerW / (this.timeToComplete * 1000) * (+new Date() - i.startTime - this.pauseDuration + i.nowPauseDuration)
-          return i.positionX - movingDistance + i.width > this.innerW
-        }).length < 2 && this.randomObstacle(1)
+        this.obstacles.filter(i => i.positionX - this.getMovingDistance(i) + i.width > this.innerW).length < 2 && this.randomObstacle(1)
+      }
+
+      obstacleItemDraw(item, movingDistance) {
+        const { width, height, positionX, positionY, type } = item
+        const poX = positionX - movingDistance
+        if (this.isDevelopment) {
+          this.ctx.lineWidth = 2
+          this.ctx.strokeStyle = this.colorDevelopBox
+          this.funStrokeRect(poX, positionY, width, -height)
+        }
+
+        // 轮廓
+        this.ctx.strokeStyle = this.colorObstacle
+        this.ctx.lineWidth = 2
+        // 嘴
+        this.funLines(
+          [poX + width / 4, positionY],
+          [poX + width / 4, positionY - height / 3],
+          [poX + width / 4 * 3, positionY - height / 3],
+          [poX + width / 4 * 3, positionY],
+        )
+        // 嘴上部左右方块
+        this.funStrokeRect(poX, positionY - height / 2, width / 5, height / 8)
+        this.funStrokeRect(poX + width / 5 * 4, positionY - height / 2, width / 5, height / 8)
+        // this.ctx.lineWidth = 4
+        this.ctx.lineJoin = 'bevel'
+        const typeFun = {
+          0: this.obstacleType0,
+          1: this.obstacleType1,
+          2: this.obstacleType2,
+        }
+        typeFun[type] && typeFun[type].call(this, item, poX)
+      }
+
+      obstacleType0(item, poX) {
+        const { width, height, positionX, positionY, type, left, right } = item
+        const eyesY = positionY - height + width
+
+        // left arm
+        this.ctx.beginPath()
+        this.ctx.moveTo(poX, positionY - height / 2)
+        this.ctx.arcTo(
+          poX - width * 2,
+          positionY - height / 2,
+          poX - width * 2.5,
+          left ? positionY - height / 3 : positionY - height / 3 * 2,
+          width
+        )
+        this.ctx.lineTo(
+          poX - width * 2.5,
+          left ? positionY - height / 3 : positionY - height / 3 * 2,
+        )
+        this.ctx.stroke()
+
+        // right arm
+        this.ctx.beginPath()
+        this.ctx.moveTo(poX + width, positionY - height / 2)
+        this.ctx.arcTo(
+          poX + width + width * 2,
+          positionY - height / 2,
+          poX + width + width * 2.5,
+          right ? positionY - height / 3 : positionY - height / 3 * 2,
+          width
+        )
+        this.ctx.lineTo(
+          poX + width + width * 2.5,
+          right ? positionY - height / 3 : positionY - height / 3 * 2,
+        )
+        this.ctx.stroke()
+
+        // eye
+        this.funStrokeRect(poX, eyesY, width, height - width)
+        this.ctx.fillStyle = this.colorBackground
+        this.funFillCircle(poX + width / 2, eyesY, width)
+        this.funStrokeCircle(poX + width / 2, eyesY, width)
+        this.ctx.fillStyle = this.colorObstacle
+        this.funFillCircle(poX + width / 2, eyesY, width / 2)
+      }
+
+      obstacleType1(item, poX) {
+        const { width, height, positionX, positionY, type } = item
+        const eyesY = positionY - height + width / 2 + height / 9
+        this.funStrokeRect(poX, positionY, width, -height)
+        // 单眼
+        this.funStrokeCircle(poX + width / 2, eyesY, (width - 8) / 2)
+        this.funFillCircle(poX + width / 2, eyesY, (width - 8) / 5)
+        // 眉
+        this.ctx.beginPath()
+        this.ctx.moveTo(
+          poX + width / 4,
+          positionY - height + height / 10
+        )
+        this.ctx.arcTo(
+          poX + width / 2,
+          positionY - height,
+          poX + width / 4 * 3,
+          positionY - height + height / 10,
+          (width - 8) / 5,
+        )
+        this.ctx.lineTo(
+          poX + width / 4 * 3,
+          positionY - height + height / 10,
+        )
+        this.ctx.stroke()
+      }
+
+      obstacleType2(item, poX) {
+        const { width, height, positionX, positionY, type } = item
+        const eyesY = positionY - height + width / 4
+        // body
+        this.funLines(
+          [poX, eyesY],
+          [poX, positionY],
+          [poX + width, positionY],
+          [poX + width, eyesY]
+        )
+        // 双眼
+        this.ctx.fillStyle = this.colorBackground
+        this.funFillCircle(poX + width / 4, eyesY, width / 4)
+        this.funFillCircle(poX + width / 4 * 3, eyesY, width / 4)
+        this.funStrokeCircle(poX + width / 4, eyesY, width / 4)
+        this.funStrokeCircle(poX + width / 4 * 3, eyesY, width / 4)
+        this.ctx.fillStyle = this.colorObstacle
+        this.funFillCircle(poX + width / 4, eyesY, width / 6)
+        this.funFillCircle(poX + width / 4 * 3, eyesY, width / 6)
       }
 
       drawPeople() {
@@ -275,48 +356,34 @@
         this.ctx.translate(0, this.roadSurface)
         // 开发辅助线
         if (this.isDevelopment) {
-          this.ctx.beginPath()
-          this.ctx.rect(
-            x,
-            0 - this.peopleY,
-            this.commonW,
-            peopleH
-          )
           this.ctx.lineWidth = 2
           this.ctx.strokeStyle = this.colorDevelopBox
-          this.ctx.stroke()
-
+          this.funStrokeRect(x, 0 - this.peopleY, this.commonW, peopleH)
           // 辅助坐标线
-          this.ctx.beginPath()
-          this.ctx.moveTo(x, -this.peopleY)
-          this.ctx.lineTo(x, -this.peopleY + 20)
-          this.ctx.lineTo(x - 5, -this.peopleY + 20)
-          this.ctx.lineTo(x, -this.peopleY + 25)
-          this.ctx.lineTo(x + 5, -this.peopleY + 20)
-          this.ctx.lineTo(x, -this.peopleY + 20)
-          this.ctx.stroke()
-
-          this.ctx.beginPath()
-          this.ctx.moveTo(x, -this.peopleY)
-          this.ctx.lineTo(x + this.commonW + 20, -this.peopleY)
-          this.ctx.lineTo(x + this.commonW + 20, -this.peopleY + 5)
-          this.ctx.lineTo(x + this.commonW + 25, -this.peopleY)
-          this.ctx.lineTo(x + this.commonW + 20, -this.peopleY - 5)
-          this.ctx.lineTo(x + this.commonW + 20, -this.peopleY)
-          this.ctx.stroke()
+          this.funLines(
+            [x, -this.peopleY],
+            [x, -this.peopleY + 20],
+            [x - 5, -this.peopleY + 20],
+            [x, -this.peopleY + 25],
+            [x + 5, -this.peopleY + 20],
+            [x, -this.peopleY + 20],
+          )
+          this.funLines(
+            [x, -this.peopleY],
+            [x + this.commonW + 20, -this.peopleY],
+            [x + this.commonW + 20, -this.peopleY + 5],
+            [x + this.commonW + 25, -this.peopleY],
+            [x + this.commonW + 20, -this.peopleY - 5],
+            [x + this.commonW + 20, -this.peopleY],
+          )
         }
-
         // head
-        this.ctx.beginPath()
-        this.ctx.arc(
+        this.ctx.fillStyle = this.colorPeople
+        this.funFillCircle(
           x + this.commonW / 4 * 3 - this.commonW / 32 * 3,
           0 - this.peopleY + peopleH - (- this.commonH / 4),
-          this.commonW / 6,
-          0,
-          2 * Math.PI
+          this.commonW / 6
         )
-        this.ctx.fillStyle = this.colorPeople
-        this.ctx.fill()
         this.ctx.lineWidth = 5
         this.ctx.strokeStyle = this.colorPeople
         this.ctx.lineCap = 'round'
@@ -324,14 +391,11 @@
         const bodyStartX = x + this.commonW / 4 * 2
         const bodyStartY = 0 - this.peopleY + peopleH - (- this.commonH / 2) - this.commonH / 8
         // neck
-        this.ctx.beginPath()
-        this.ctx.moveTo(bodyStartX, bodyStartY)
-        this.ctx.lineTo(
-          bodyStartX + this.commonW / 8,
-          bodyStartY - this.commonH / 8
+        this.funLines(
+          [bodyStartX, bodyStartY],
+          [bodyStartX + this.commonW / 8, bodyStartY - this.commonH / 8]
         )
-        this.ctx.stroke()
-
+        // legs
         this.operate.squat
           ? this.bodyIsSquat(x, y, bodyStartX, bodyStartY, peopleH)
           : this.bodyIsNotSquat(x, y, bodyStartX, bodyStartY, peopleH)
@@ -348,73 +412,40 @@
       // 人物蹲
       bodyIsSquat(x, y, bodyStartX, bodyStartY, peopleH) {
         // body
-        this.ctx.beginPath()
-        this.ctx.moveTo(bodyStartX, bodyStartY)
-        this.ctx.lineTo(
-          x + this.commonW / 4,
-          0 - this.peopleY + peopleH - (- this.commonH / 2),
+        this.funLines(
+          [bodyStartX, bodyStartY],
+          [x + this.commonW / 4, 0 - this.peopleY + peopleH - (- this.commonH / 2),]
         )
-        this.ctx.stroke()
-
         const legStartX = x + this.commonW / 4
         const legStartY = 0 - this.peopleY + peopleH - (- this.commonH / 2)
         // legs
-        this.ctx.beginPath()
-        this.ctx.moveTo(legStartX, legStartY)
-        this.ctx.lineTo(
-          legStartX + this.commonW / 5 * 2,
-          legStartY + this.commonH / 4
+        this.funLines(
+          [legStartX, legStartY],
+          [legStartX + this.commonW / 5 * 2, legStartY + this.commonH / 4],
+          [legStartX - this.commonW / 16, legStartY + this.commonH / 2 - this.commonH / 8],
+          [legStartX, legStartY + this.commonH / 2],
         )
-        this.ctx.lineTo(
-          legStartX - this.commonW / 16,
-          legStartY + this.commonH / 2 - this.commonH / 8
+        this.funLines(
+          [legStartX, legStartY],
+          [legStartX + this.commonW / 5 * 2, legStartY + this.commonH / 4],
+          [legStartX + this.commonW / 16, legStartY + this.commonH / 2 - this.commonH / 8],
+          [legStartX + this.commonW / 16 * 2, legStartY + this.commonH / 2],
         )
-        this.ctx.lineTo(
-          legStartX,
-          legStartY + this.commonH / 2
-        )
-        this.ctx.stroke()
-
-        this.ctx.beginPath()
-        this.ctx.moveTo(legStartX, legStartY)
-        this.ctx.lineTo(
-          legStartX + this.commonW / 5 * 2,
-          legStartY + this.commonH / 4
-        )
-        this.ctx.lineTo(
-          legStartX + this.commonW / 16,
-          legStartY + this.commonH / 2 - this.commonH / 8
-        )
-        this.ctx.lineTo(
-          legStartX + this.commonW / 16 * 2,
-          legStartY + this.commonH / 2
-        )
-        this.ctx.stroke()
-
         // arms
-        this.ctx.beginPath()
-        this.ctx.moveTo(bodyStartX, bodyStartY)
-        this.ctx.lineTo(
-          legStartX,
-          bodyStartY - this.commonH / 4
+        this.funLines(
+          [bodyStartX, bodyStartY],
+          [legStartX, bodyStartY - this.commonH / 4],
+          [legStartX, legStartY],
         )
-        this.ctx.lineTo(legStartX, legStartY)
-        this.ctx.stroke()
       }
 
       // 人物正常身形
       bodyIsNotSquat(x, y, bodyStartX, bodyStartY, peopleH) {
         // body
-        this.ctx.beginPath()
-        this.ctx.moveTo(
-          bodyStartX,
-          bodyStartY,
+        this.funLines(
+          [bodyStartX, bodyStartY],
+          [x + this.commonW / 2, 0 - this.peopleY + peopleH - (- this.commonH)]
         )
-        this.ctx.lineTo(
-          x + this.commonW / 2,
-          0 - this.peopleY + peopleH - (- this.commonH),
-        )
-        this.ctx.stroke()
 
         const legStartX = x + this.commonW / 2
         const legStartY = 0 - this.peopleY + peopleH - (- this.commonH)
@@ -424,46 +455,36 @@
           this.leg0(legStartX, legStartY)
           this.leg3(legStartX, legStartY)
         } else {
-          this.legFunctions[this.legLeft].call(this, legStartX, legStartY)
-          this.legFunctions[this.legRight].call(this, legStartX, legStartY)
+          const legFunctions = {
+            0: this.leg0,
+            1: this.leg1,
+            2: this.leg2,
+            3: this.leg3,
+            4: this.leg4,
+            5: this.leg5,
+            6: this.leg6,
+            7: this.leg7,
+          }
+
+          legFunctions[this.legLeft].call(this, legStartX, legStartY)
+          legFunctions[this.legRight].call(this, legStartX, legStartY)
           this.legLeft = Math.floor((this.gameDuration / 100) % 8)
           this.legRight = Math.floor(((this.gameDuration / 100) + 4) % 8)
         }
 
         // arms
-        this.ctx.beginPath()
-        this.ctx.moveTo(bodyStartX, bodyStartY)
-        this.ctx.lineTo(
-          x + this.commonW / 4 * 1,
-          0 - this.peopleY + peopleH - (- this.commonH) / 4 * 3,
+        this.funLines(
+          [bodyStartX, bodyStartY],
+          [x + this.commonW / 4 * 1, 0 - this.peopleY + peopleH - (- this.commonH) / 4 * 3],
+          [x + this.commonW / 2, 0 - this.peopleY + peopleH - (- this.commonH)],
         )
-        this.ctx.lineTo(
-          x + this.commonW / 2,
-          0 - this.peopleY + peopleH - (- this.commonH),
-        )
-        this.ctx.stroke()
       }
 
+      // 碰撞检测
       impactChecking(people) {
         const { x, y, w, h } = people
-        // console.log(x, y, w, h)
-        // console.log(this.ctx.getImageData(x, y, w, -h).data.join(''))
-        if (this.numberOfRuns % 16 === 0) {
-          // console.log(this.ctx.getImageData(x, y, w, h).data.join(''))
-        }
-        // console.log(people)
-        // for (let i = x; i < x + w; i = i + 10) {
-        //   for (let j = y; j > y + h; j = j - 10) {
-        //     // if (this.ctx.getImageData(i, j, 1, 1).data[3] !== 0.99 && this.ctx.getImageData(i, j, 1, 1).data[3] !== 0) {
-        //     //   console.log(this.ctx.getImageData(i, j, 1, 1).data)
-        //     //   return
-        //     // }
-        //     console.log(this.ctx.getImageData(i, j, 10, 10).data)
-        //   }
-        // }
-        // console.log(this.ctx.getImageData(people.x, people.y, 1, 1).data[3])
         for (let i of this.obstacles) {
-          const movingDistance = this.innerW / (this.timeToComplete * 1000) * (+new Date() - i.startTime - this.pauseDuration + i.nowPauseDuration)
+          const movingDistance = this.getMovingDistance(i)
           const obstacle = {
             iX: i.positionX - movingDistance,
             iY: i.positionY,
@@ -501,107 +522,157 @@
       randomObstacle(randomNumber) {
         for (let i = 0; i <= randomNumber; i++) {
           const isFly = !!(Math.random() > 0.5)
-          const h = Math.round(0.7 * this.commonH * (Math.round(Math.random() * 2) + 1))
-          const w = Math.round(0.2 * this.commonW * (Math.round(Math.random() * 5) + 1))
+          const height = Math.round(0.7 * this.commonH * (Math.round(Math.random() * 2) + 1))
+          const width = Math.round(0.2 * this.commonW * (Math.round(Math.random() * 5) + 1))
           const last = this.obstacles[this.obstacles.length - 1]
           // is not first one
-          const movingDistance = last
-            ? this.innerW / (this.timeToComplete * 1000) * (+new Date() - last.startTime - this.pauseDuration + last.nowPauseDuration)
-            : 0
+          const movingDistance = last ? this.getMovingDistance(last) : 0
           const lastPositionX = last ? last.positionX - movingDistance + last.width : this.innerW
           const positionX = Math.round(Math.random() * this.innerW) / 2 + lastPositionX + 3 * this.commonW
+          let type = 0
+          if (width <= this.commonW / 4) {
+            type = 0
+          } else if (width * 2 <= height) {
+            type = 1
+          } else {
+            type = 2
+          }
           this.obstacles.push({
-            height: h,
-            width: w,
+            height,
+            width,
+            isFly, // 是否在空中
             positionX,
             positionY: isFly ? -(Math.round(Math.random()) + 0.5) * this.commonH : 0,
             startTime: +new Date(), // 创建时间
             nowPauseDuration: this.pauseDuration, // 当前暂停时间
-            isFly, // 是否在空中
             isPassed: false, // 是否通过
-            centerX: w + positionX / 2, // 中心点X坐标
+            centerX: width + positionX / 2, // 中心点X坐标
+            type, // 类型
+            left: !!(Math.random() > 0.5),
+            right: !!(Math.random() > 0.5),
           })
         }
       }
 
+      // 获取移动距离
+      getMovingDistance(item) {
+        return this.innerW / (this.timeToComplete * 1000) * (+new Date() - item.startTime - this.pauseDuration + item.nowPauseDuration)
+      }
+
+      funLines(...args) {
+        if (args.length) {
+          this.ctx.beginPath()
+          args.forEach((item, index) => {
+            index === 0
+              ? this.ctx.moveTo(item[0], item[1])
+              : this.ctx.lineTo(item[0], item[1])
+          })
+          this.ctx.stroke()
+        }
+      }
+
+      funStrokeCircle(x, y, r, start = 0, end = 2 * Math.PI) {
+        this.ctx.beginPath()
+        this.ctx.arc(x, y, r, start, end)
+        this.ctx.stroke()
+      }
+
+      funFillCircle(x, y, r, start = 0, end = 2 * Math.PI) {
+        this.ctx.beginPath()
+        this.ctx.arc(x, y, r, start, end)
+        this.ctx.fill()
+      }
+
+      funStrokeRect(x, y, w, h) {
+        this.ctx.beginPath()
+        this.ctx.rect(x, y, w, h)
+        this.ctx.stroke()
+      }
+
+      funFillRect(x, y, w, h) {
+        this.ctx.beginPath()
+        this.ctx.rect(x, y, w, h)
+        this.ctx.fill()
+      }
+
       leg0(x, y) {
         const { commonH, commonW } = this
-        this.ctx.beginPath()
-        this.ctx.moveTo(x, y)
-        this.ctx.lineTo(x + commonW / 4, y - (-commonH / 3))
-        this.ctx.lineTo(x + (commonW / 8) * 3, y - (-commonH))
-        this.ctx.lineTo(x + (commonW / 8) * 3 + commonW / 8, y - (-commonH))
-        this.ctx.stroke()
+        this.funLines(
+          [x, y],
+          [x + commonW / 4, y - (-commonH / 3)],
+          [x + (commonW / 8) * 3, y - (-commonH)],
+          [x + (commonW / 8) * 3 + commonW / 8, y - (-commonH)]
+        )
       }
 
       leg1(x, y) {
         const { commonH, commonW } = this
-        this.ctx.beginPath()
-        this.ctx.moveTo(x, y)
-        this.ctx.lineTo(x + commonW / 8, y - (-commonH / 5) * 2)
-        this.ctx.lineTo(x + (commonW / 16) * 3, y - (-commonH))
-        this.ctx.lineTo(x + (commonW / 16) * 3 + commonW / 8, y - (-commonH))
-        this.ctx.stroke()
+        this.funLines(
+          [x, y],
+          [x + commonW / 8, y - (-commonH / 5) * 2],
+          [x + (commonW / 16) * 3, y - (-commonH)],
+          [x + (commonW / 16) * 3 + commonW / 8, y - (-commonH)],
+        )
       }
 
       leg2(x, y) {
         const { commonH, commonW } = this
-        this.ctx.beginPath()
-        this.ctx.moveTo(x, y)
-        this.ctx.lineTo(x + commonW / 16, y - (-commonH / 2))
-        this.ctx.lineTo(x - (commonW / 8), y - (-commonH))
-        this.ctx.lineTo(x, y - (-commonH))
-        this.ctx.stroke()
+        this.funLines(
+          [x, y],
+          [x + commonW / 16, y - (-commonH / 2)],
+          [x - (commonW / 8), y - (-commonH)],
+          [x, y - (-commonH)],
+        )
       }
 
       leg3(x, y) {
         const { commonH, commonW } = this
-        this.ctx.beginPath()
-        this.ctx.moveTo(x, y)
-        this.ctx.lineTo(x - commonW / 16, y - (-commonH / 5) * 2)
-        this.ctx.lineTo(x - (commonW / 8) * 3, y - (-commonH / 8) * 7)
-        this.ctx.lineTo(x - (commonW / 8) * 3, y - (-commonH))
-        this.ctx.stroke()
+        this.funLines(
+          [x, y],
+          [x - commonW / 16, y - (-commonH / 5) * 2],
+          [x - (commonW / 8) * 3, y - (-commonH / 8) * 7],
+          [x - (commonW / 8) * 3, y - (-commonH)],
+        )
       }
 
       leg4(x, y) {
         const { commonH, commonW } = this
-        this.ctx.beginPath()
-        this.ctx.moveTo(x, y)
-        this.ctx.lineTo(x - commonW / 8, y - (-commonH / 3) * 1)
-        this.ctx.lineTo(x - (commonW / 8) * 4, y - (-commonH / 4) * 1)
-        this.ctx.lineTo(x - (commonW / 8) * 4, y - (-commonH / 8) * 3)
-        this.ctx.stroke()
+        this.funLines(
+          [x, y],
+          [x - commonW / 8, y - (-commonH / 3) * 1],
+          [x - (commonW / 8) * 4, y - (-commonH / 4) * 1],
+          [x - (commonW / 8) * 4, y - (-commonH / 8) * 3],
+        )
       }
 
       leg5(x, y) {
         const { commonH, commonW } = this
-        this.ctx.beginPath()
-        this.ctx.moveTo(x, y)
-        this.ctx.lineTo(x + commonW / 4, y - (-commonH / 4) * 1)
-        this.ctx.lineTo(x + commonW / 4 - (commonW / 2), y - (-commonH / 4) * 1)
-        this.ctx.lineTo(x + commonW / 4 - (commonW / 3) * 2, y - (-commonH / 8) * 3)
-        this.ctx.stroke()
+        this.funLines(
+          [x, y],
+          [x + commonW / 4, y - (-commonH / 4) * 1],
+          [x + commonW / 4 - (commonW / 2), y - (-commonH / 4) * 1],
+          [x + commonW / 4 - (commonW / 3) * 2, y - (-commonH / 8) * 3],
+        )
       }
 
       leg6(x, y) {
         const { commonH, commonW } = this
-        this.ctx.beginPath()
-        this.ctx.moveTo(x, y)
-        this.ctx.lineTo(x + (commonW / 16) * 6, y - (-commonH / 8) * 1)
-        this.ctx.lineTo(x, y - (-commonH / 2) * 1)
-        this.ctx.lineTo(x + commonW / 8, y - (-commonH / 8) * 5)
-        this.ctx.stroke()
+        this.funLines(
+          [x, y],
+          [x + (commonW / 16) * 6, y - (-commonH / 8) * 1],
+          [x, y - (-commonH / 2) * 1],
+          [x + commonW / 8, y - (-commonH / 8) * 5],
+        )
       }
 
       leg7(x, y) {
         const { commonH, commonW } = this
-        this.ctx.beginPath()
-        this.ctx.moveTo(x, y)
-        this.ctx.lineTo(x + (commonW / 8) * 3, y - (-commonH / 3))
-        this.ctx.lineTo(x + (commonW / 8) * 3, y - (-commonH))
-        this.ctx.lineTo(x + (commonW / 8) * 3 + commonW / 8, y - (-commonH))
-        this.ctx.stroke()
+        this.funLines(
+          [x, y],
+          [x + (commonW / 8) * 3, y - (-commonH / 3)],
+          [x + (commonW / 8) * 3, y - (-commonH)],
+          [x + (commonW / 8) * 3 + commonW / 8, y - (-commonH)],
+        )
       }
     }
     new CanvasA()
