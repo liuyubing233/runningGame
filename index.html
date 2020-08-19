@@ -70,6 +70,8 @@
       colorBackground = '#ffffff'   // 背景颜色
       colorDevelopPoint = '#ff0000' // 开发点颜色
       colorCloud = '#cccccc'        // 云颜色
+      colorTitle = '#47484a'        // title颜色
+      colorOperate = '#111f2c'      // 操作提示颜色
 
       legLeft = 1   // 左
       legRight = 4  // 右
@@ -95,15 +97,17 @@
 
       // 开始前文案
       initStartText() {
-        this.ctx.fillStyle = this.colorObstacle
-        this.ctx.strokeStyle = this.colorObstacle
-        this.ctx.lineWidth = 6
-        this.ctx.font = `${this.commonW * 2}px heiti`
+        this.ctx.fillStyle = this.colorTitle
+        this.ctx.strokeStyle = this.colorTitle
+        this.ctx.lineWidth = 4
+        this.ctx.font = `${this.commonW}px heiti`
         this.ctx.strokeText('AWESOME MAN', this.commonW * 0.5, this.commonH * 3)
 
+        this.ctx.fillStyle = this.colorOperate
+        this.ctx.strokeStyle = this.colorOperate
         this.ctx.lineWidth = 1
         this.ctx.font = `${this.commonW / 2}px heiti`
-        this.ctx.fillText('Click the space to start the game', this.commonW * 4, this.commonH * 4)
+        this.ctx.fillText('Click the [space] to start the game', this.commonW * 4, this.commonH * 4)
 
         const w = this.commonW - 20
         const up = { x: this.commonW * 7 + 10, y: this.commonH * 5 + 10 }
@@ -205,16 +209,16 @@
 
       drawGameOver() {
         this.initParam()
-        this.ctx.strokeStyle = this.colorObstacle
+        this.ctx.strokeStyle = this.colorTitle
         this.ctx.fillStyle = this.colorBackground
         this.ctx.lineWidth = 6
         this.ctx.font = `${this.commonW * 2}px heiti`
         this.ctx.strokeText('GAME OVER', this.commonW * 2.5, this.commonH * 3)
 
         this.ctx.lineWidth = 1
-        this.ctx.fillStyle = this.colorObstacle
+        this.ctx.fillStyle = this.colorOperate
         this.ctx.font = `${this.commonW / 2}px heiti`
-        this.ctx.fillText('Click the space to restart the game', this.commonW * 4, this.commonH * 4)
+        this.ctx.fillText('Click the [space] to restart the game', this.commonW * 4, this.commonH * 4)
       }
 
       // 画云
