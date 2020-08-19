@@ -22,8 +22,8 @@
   <canvas id="canvas"></canvas>
   <script type="text/javascript">
     class CanvasA {
-      isDevelopment = true  // 是否开发模式（显示辅助线）
-      canPause = true       // 是否可以暂停
+      isDevelopment = false  // 是否开发模式（显示辅助线）true | false
+      canPause = false       // 是否可以暂停
 
       ctx = undefined
       innerW = 1000         // 界面宽度
@@ -36,6 +36,7 @@
 
       roadUnderLines = []   // 路面底部线条数组
       obstacles = []        // 障碍物数组
+      clouds = []           // 云的数组
       peopleX = 0           // 人物坐标x
       peopleY = 0           // 人物坐标y
       /*
@@ -50,6 +51,7 @@
       isMoveUp = false        // 是否在向上移动
       isPause = true          // 是否暂停 默认暂停
       isStart = false         // 是否开始
+      isGameOver = false      // 游戏结束
       // this.traverse = 0    // 惯性 left: -1, right: 1, noMove: 0
       startTime = 0           // 开始时间
       pauseTime = 0           // 暂停时间
@@ -67,6 +69,7 @@
       colorDevelopBox = '#aaaaaa'   // 开发线颜色
       colorBackground = '#ffffff'   // 背景颜色
       colorDevelopPoint = '#ff0000' // 开发点颜色
+      colorCloud = '#cccccc'        // 云颜色
 
       legLeft = 1   // 左
       legRight = 4  // 右
@@ -87,15 +90,50 @@
         this.draw()
         document.addEventListener('keydown', (e) => this.keydownFun(e))
         document.addEventListener('keyup', (e) => this.keyupFun(e))
+        this.initStartText()
+      }
 
+      // 开始前文案
+      initStartText() {
+        this.ctx.fillStyle = this.colorObstacle
+        this.ctx.strokeStyle = this.colorObstacle
         this.ctx.lineWidth = 6
         this.ctx.font = `${this.commonW * 2}px heiti`
         this.ctx.strokeText('AWESOME MAN', this.commonW * 0.5, this.commonH * 3)
 
         this.ctx.lineWidth = 1
-        this.ctx.fillStyle = this.colorObstacle
         this.ctx.font = `${this.commonW / 2}px heiti`
         this.ctx.fillText('Click the space to start the game', this.commonW * 4, this.commonH * 4)
+
+        const w = this.commonW - 20
+        const up = { x: this.commonW * 7 + 10, y: this.commonH * 5 + 10 }
+        this.ctx.font = `${w / 2.5}px heiti`
+        this.funDrawCode(up, w, '↑')
+        this.ctx.fillText('jump', up.x, up.y - w / 2)
+        const down = { x: this.commonW * 7 + 10, y: this.commonH * 6 }
+        this.funDrawCode(down, w, '↓')
+        this.ctx.fillText('squat', down.x, down.y + w / 2 * 3)
+        const left = { x: this.commonW * 6 + 20, y: this.commonH * 6 }
+        this.funDrawCode(left, w, '←')
+        this.ctx.fillText('go left', left.x - w / 2 * 3, left.y + w / 2)
+        const right = { x: this.commonW * 8, y: this.commonH * 6 }
+        this.funDrawCode(right, w, '→')
+        this.ctx.fillText('go right', right.x + w / 2 * 3, right.y + w / 2)
+
+      }
+
+      funDrawCode(c, w, t) {
+        this.funStrokeRect(c.x, c.y, w, w)
+        this.funStrokeRect(c.x + 5, c.y + 5, w - 10, w - 10)
+        this.funLines([c.x, c.y], [c.x + 5, c.y + 5])
+        this.funLines([c.x + w, c.y], [c.x + w - 5, c.y + 5])
+        this.funLines([c.x, c.y + w], [c.x + 5, c.y + w - 5])
+        this.funLines([c.x + w, c.y + w], [c.x + w - 5, c.y + w - 5])
+        this.ctx.textBaseline = 'middle';
+        this.ctx.textAlign = 'center'
+        this.ctx.fillText(t, c.x + w / 2, c.y + w / 2)
+        this.ctx.textBaseline = 'alphabetic';
+        this.ctx.textAlign = 'start'
       }
 
       keydownFun(e) {
@@ -126,6 +164,11 @@
 
       keydownSpace() {
         !this.isStart && (this.isStart = true)
+        if (this.isGameOver) {
+          this.numberOfGame = 0
+          this.gameDuration = 0
+          this.isGameOver = false
+        }
         if (this.canPause) {
           if (this.isPause) {
             this.isPause = false
@@ -146,22 +189,108 @@
         this.drawRoad()
         this.drawObstacle()
         this.drawPeople()
+        this.drawClouds()
         this.numberOfRuns++
         this.drawScoreboard()
+        this.isGameOver && this.drawGameOver()
         if (this.isStart) {
           this.gameDuration = +new Date() - this.startTime - this.pauseDuration
           !this.isPause && requestAnimationFrame(() => this.draw())
         }
       }
 
+      drawGameOver() {
+        this.initParam()
+        this.ctx.strokeStyle = this.colorObstacle
+        this.ctx.fillStyle = this.colorBackground
+        this.ctx.lineWidth = 6
+        this.ctx.font = `${this.commonW * 2}px heiti`
+        this.ctx.strokeText('GAME OVER', this.commonW * 2.5, this.commonH * 3)
+
+        this.ctx.lineWidth = 1
+        this.ctx.fillStyle = this.colorObstacle
+        this.ctx.font = `${this.commonW / 2}px heiti`
+        this.ctx.fillText('Click the space to restart the game', this.commonW * 4, this.commonH * 4)
+      }
+
+      // 画云
+      drawClouds() {
+        this.ctx.lineWidth = 1
+        this.ctx.strokeStyle = this.colorCloud
+        this.ctx.fillStyle = this.colorBackground
+
+        this.clouds.forEach((item, index) => {
+          const movingDistance = this.getMovingDistance(item)
+          if (item.positionX + 2 * item.r + 2*this.commonW - movingDistance < 0) {
+            this.clouds.splice(index, 1)
+          } else {
+            this.ctx.beginPath()
+            this.ctx.ellipse(
+              item.positionX - movingDistance,
+              item.positionY,
+              item.r * 2,
+              item.r,
+              0, 0, 2*Math.PI
+            )
+            this.ctx.fill()
+            this.ctx.stroke()
+
+            this.ctx.beginPath()
+            this.ctx.ellipse(
+              item.positionX - item.r*2 - movingDistance,
+              item.positionY + item.r / 4,
+              item.r * 2,
+              item.r,
+              0, 0.25 * Math.PI, 1.75*Math.PI
+            )
+            this.ctx.fill()
+            this.ctx.stroke()
+            // this.funFillCircle(
+            //   item.positionX - movingDistance,
+            //   item.positionY - item.r,
+            //   item.r,
+            //   0.75 * Math.PI,
+            //   2.25 * Math.PI,
+            // )
+            // this.ctx.stroke()
+            // this.funFillCircle(
+            //   item.positionX - item.r * 1.5 - movingDistance,
+            //   item.positionY,
+            //   item.r,
+            //   0.25 * Math.PI,
+            //   1.75 * Math.PI,
+            // )
+            // this.ctx.stroke()
+            // this.funFillCircle(
+            //   item.positionX + item.r * 1.5 - movingDistance,
+            //   item.positionY,
+            //   item.r,
+            //   -0.75 * Math.PI,
+            //   0.75 * Math.PI
+            // )
+            // this.ctx.stroke()
+            // this.funFillCircle(
+            //   item.positionX - movingDistance,
+            //   item.positionY,
+            //   item.r,
+            //   0.1 * Math.PI,
+            //   0.9 * Math.PI,
+            // )
+            // this.ctx.stroke()
+
+          }
+        })
+        this.clouds.length < 5 && this.randomClouds(Math.round(Math.random() * 2) + 1, this.innerW)
+      }
+
       // 计分板
       drawScoreboard() {
         this.ctx.lineWidth = 1
         this.ctx.fillStyle = this.colorObstacle
-        this.ctx.font = `${this.commonW / 4}px heiti`
+        this.ctx.font = `${this.commonW / 3}px heiti`
         this.ctx.fillText(
-          `Time: ${Math.floor(this.gameDuration / 1000)}s    Score: ${this.numberOfGame}`,
-          this.commonW * 11,
+          `Time: ${Math.floor(this.gameDuration / 1000)}s    Score: ${this.numberOfGame * 100}`,
+          this.commonW * 12,
           this.commonH,
         )
       }
@@ -544,7 +673,7 @@
           }
           // console.log(obstacle, this.peopleHead)
           if (this.impactCheckingVerity(obstacle)) {
-            this.gameOver()
+            this.isGameOver = true
             return
           }
           if (pCenter[0] >= next.centerX - this.getMovingDistance(next)) {
@@ -573,18 +702,17 @@
         return !(cX + cR < x || cX - cR > x + w || -cY + cR < -y || -cY - cR > -y + h)
       }
 
-      gameOver() {
-        console.log('is check')
-        this.initParam()
-
-        this.ctx.lineWidth = 6
-        this.ctx.font = `${this.commonW * 2}px heiti`
-        this.ctx.strokeText('GAME OVER', this.commonW * 2.5, this.commonH * 3)
-
-        this.ctx.lineWidth = 1
-        this.ctx.fillStyle = this.colorObstacle
-        this.ctx.font = `${this.commonW / 2}px heiti`
-        this.ctx.fillText('Click the space to restart the game', this.commonW * 4, this.commonH * 4)
+      randomClouds(randomNumber, addPositionX = 0) {
+        for (let i = 0; i <= randomNumber; i++) {
+          const r = Math.round((Math.random() + 0.5) * this.commonW / 2)
+          this.clouds.push({
+            r,
+            positionX: Math.round(Math.random() * this.innerW) - r + addPositionX,
+            positionY: Math.round(Math.random() * 3 * this.commonH) + this.commonH,
+            nowPauseDuration: this.pauseDuration,
+            startTime: +new Date(),
+          })
+        }
       }
 
       randomUnderLines(randomNumber, addPositionX = 0) {
@@ -666,15 +794,11 @@
       }
 
       funStrokeRect(x, y, w, h) {
-        this.ctx.beginPath()
-        this.ctx.rect(x, y, w, h)
-        this.ctx.stroke()
+        this.ctx.strokeRect(x, y, w, h)
       }
 
       funFillRect(x, y, w, h) {
-        this.ctx.beginPath()
-        this.ctx.rect(x, y, w, h)
-        this.ctx.fill()
+        this.ctx.fillRect(x, y, w, h)
       }
 
       leg0(x, y) {
@@ -806,17 +930,21 @@
         this.legRight = 4  // 右
         this.isPause = true
         this.isStart = false
-        this.numberOfGame = 0
         this.startTime = +new Date()
         this.pauseTime = +new Date()
+        if (!this.isGameOver) {
+          this.gameDuration = 0
+          this.numberOfGame = 0
+        }
         this.pauseDuration = 0
-        this.gameDuration = 0
         this.roadUnderLines = []
         this.obstacles = []
+        this.clouds = []
         this.peopleX = 0           // 人物坐标x
         this.peopleY = 0           // 人物坐标y
-        this.randomUnderLines(Math.round(Math.random() * 5) + 1, 0)
+        this.randomUnderLines(Math.round(Math.random() * 5) + 1)
         this.randomObstacle(Math.round(Math.random() * 3) + 1)
+        this.randomClouds(Math.round(Math.random() * 2) + 1)
       }
     }
     new CanvasA()
