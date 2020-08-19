@@ -169,7 +169,10 @@
       keydownSpace() {
         if (!this.isStart) {
           this.isStart = true
-          !this.canPause && (this.isPause = false)
+          if (!this.canPause) {
+            this.isPause = false
+            this.pauseDuration = this.pauseTime === 0 ? 0 : this.pauseDuration + (+new Date()) - this.pauseTime
+          }
         }
 
         if (this.isGameOver) {
