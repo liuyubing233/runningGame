@@ -173,23 +173,24 @@
             this.isPause = false
             this.pauseDuration = this.pauseTime === 0 ? 0 : this.pauseDuration + (+new Date()) - this.pauseTime
           }
+          this.draw()
         }
-
         if (this.isGameOver) {
           this.numberOfGame = 0
           this.gameDuration = 0
           this.isGameOver = false
+          this.initParam()
         }
         if (this.canPause) {
           if (this.isPause) {
             this.isPause = false
             this.pauseDuration = this.pauseTime === 0 ? 0 : this.pauseDuration + (+new Date()) - this.pauseTime
+            this.draw()
           } else {
             this.isPause = true
             this.pauseTime = +new Date()
           }
         }
-        this.draw()
       }
 
       draw() {
@@ -211,7 +212,6 @@
       }
 
       drawGameOver() {
-        this.initParam()
         this.ctx.strokeStyle = this.colorTitle
         this.ctx.fillStyle = this.colorBackground
         this.ctx.lineWidth = 6
@@ -652,6 +652,8 @@
           // console.log(obstacle, this.peopleHead)
           if (this.impactCheckingVerity(obstacle)) {
             this.isGameOver = true
+            this.isStart = false
+            this.isPause = true
             return
           }
           if (pCenter[0] >= next.centerX - this.getMovingDistance(next)) {
@@ -906,8 +908,6 @@
         this.peoplePoints = []                 // 人物身上取点用于碰撞检测
         this.legLeft = 1   // 左
         this.legRight = 4  // 右
-        this.isPause = true
-        this.isStart = false
         this.startTime = +new Date()
         this.pauseTime = +new Date()
         if (!this.isGameOver) {
