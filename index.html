@@ -21,6 +21,16 @@
 <body>
   <canvas id="canvas"></canvas>
   <script type="text/javascript">
+    COLOR_FLOOR = '#111f2c'         // 地面颜色
+    COLOR_OBSTACLE = '#111f2c'      // 障碍物颜色
+    COLOR_PEOPLE = '#111f2c'        // 人物颜色
+    COLOR_DEVELOP_BOX = '#aaaaaa'   // 开发线颜色
+    COLOR_DEVELOP_POINT = '#ff0000' // 开发点颜色
+    COLOR_BACKGROUND = '#ffffff'    // 背景颜色
+    COLOR_CLOUD = '#cccccc'         // 云颜色
+    COLOR_TITLE = '#47484a'         // title颜色
+    COLOR_OPERATE = '#111f2c'       // 操作提示颜色
+
     class CanvasA {
       isDevelopment = false  // 是否开发模式（显示辅助线）true | false
       canPause = false       // 是否可以暂停
@@ -63,16 +73,6 @@
       peopleHead = { x: 0, y: 0, z: 0 } // 人物脑袋用于碰撞检测
       peoplePoints = []                 // 人物身上取点用于碰撞检测
 
-      colorFloor = '#111f2c'        // 地面颜色
-      colorObstacle = '#111f2c'     // 障碍物颜色
-      colorPeople = '#111f2c'       // 人物颜色
-      colorDevelopBox = '#aaaaaa'   // 开发线颜色
-      colorBackground = '#ffffff'   // 背景颜色
-      colorDevelopPoint = '#ff0000' // 开发点颜色
-      colorCloud = '#cccccc'        // 云颜色
-      colorTitle = '#47484a'        // title颜色
-      colorOperate = '#111f2c'      // 操作提示颜色
-
       legLeft = 1   // 左
       legRight = 4  // 右
 
@@ -97,14 +97,14 @@
 
       // 开始前文案
       initStartText() {
-        this.ctx.fillStyle = this.colorTitle
-        this.ctx.strokeStyle = this.colorTitle
+        this.ctx.fillStyle = COLOR_TITLE
+        this.ctx.strokeStyle = COLOR_TITLE
         this.ctx.lineWidth = 4
         this.ctx.font = `${this.commonW}px heiti`
         this.ctx.strokeText('AWESOME MAN', this.commonW * 0.5, this.commonH * 3)
 
-        this.ctx.fillStyle = this.colorOperate
-        this.ctx.strokeStyle = this.colorOperate
+        this.ctx.fillStyle = COLOR_OPERATE
+        this.ctx.strokeStyle = COLOR_OPERATE
         this.ctx.lineWidth = 1
         this.ctx.font = `${this.commonW / 2}px heiti`
         this.ctx.fillText('Click the [space] to start the game', this.commonW * 4, this.commonH * 4)
@@ -141,7 +141,7 @@
       }
 
       keydownFun(e) {
-        const KEY_DOWN = {
+        const keydown = {
           38: () => this.operate.jump = true,
           40: () => this.operate.squat = true,
           37: () => {
@@ -154,16 +154,16 @@
           },
           32: this.keydownSpace
         }
-        KEY_DOWN[e.keyCode] && KEY_DOWN[e.keyCode].call(this)
+        keydown[e.keyCode] && keydown[e.keyCode].call(this)
       }
 
       keyupFun(e) {
-        const KEY_UP = {
+        const keyup = {
           40: () => this.operate.squat = false,
           37: () => this.operate.left = false,
           39: () => this.operate.right = false,
         }
-        KEY_UP[e.keyCode] && KEY_UP[e.keyCode].call(this)
+        keyup[e.keyCode] && keyup[e.keyCode].call(this)
       }
 
       keydownSpace() {
@@ -212,14 +212,14 @@
       }
 
       drawGameOver() {
-        this.ctx.strokeStyle = this.colorTitle
-        this.ctx.fillStyle = this.colorBackground
+        this.ctx.strokeStyle = COLOR_TITLE
+        this.ctx.fillStyle = COLOR_BACKGROUND
         this.ctx.lineWidth = 6
         this.ctx.font = `${this.commonW * 2}px heiti`
         this.ctx.strokeText('GAME OVER', this.commonW * 2.5, this.commonH * 3)
 
         this.ctx.lineWidth = 1
-        this.ctx.fillStyle = this.colorOperate
+        this.ctx.fillStyle = COLOR_OPERATE
         this.ctx.font = `${this.commonW / 2}px heiti`
         this.ctx.fillText('Click the [space] to restart the game', this.commonW * 4, this.commonH * 4)
       }
@@ -227,8 +227,8 @@
       // 画云
       drawClouds() {
         this.ctx.lineWidth = 1
-        this.ctx.strokeStyle = this.colorCloud
-        this.ctx.fillStyle = this.colorBackground
+        this.ctx.strokeStyle = COLOR_CLOUD
+        this.ctx.fillStyle = COLOR_BACKGROUND
 
         this.clouds.forEach((item, index) => {
           const movingDistance = this.getMovingDistance(item)
@@ -264,7 +264,7 @@
       // 计分板
       drawScoreboard() {
         this.ctx.lineWidth = 1
-        this.ctx.fillStyle = this.colorObstacle
+        this.ctx.fillStyle = COLOR_OBSTACLE
         this.ctx.font = `${this.commonW / 3}px heiti`
         this.ctx.fillText(
           `Time: ${Math.floor(this.gameDuration / 1000)}s    Score: ${this.numberOfGame * 100}`,
@@ -276,7 +276,7 @@
       // background line
       drawBgLine() {
         if (this.isDevelopment) {
-          this.ctx.strokeStyle = this.colorDevelopBox
+          this.ctx.strokeStyle = COLOR_DEVELOP_BOX
           this.ctx.lineWidth = 1
           for (let i = 1; i <= Math.round(this.innerW / this.commonW); i++) {
             this.funLines([this.commonW * i, 0], [this.commonW * i, this.innerH])
@@ -288,7 +288,7 @@
       }
 
       drawRoad() {
-        this.ctx.strokeStyle = this.colorFloor
+        this.ctx.strokeStyle = COLOR_FLOOR
         this.ctx.lineWidth = 10
         this.funLines([0, this.roadSurface + 5], [this.innerW, this.roadSurface + 5])
         this.roadUnderLines.forEach((item, index) => {
@@ -324,13 +324,13 @@
         const poX = positionX - movingDistance
         if (this.isDevelopment) {
           this.ctx.lineWidth = 2
-          this.ctx.strokeStyle = this.colorDevelopBox
+          this.ctx.strokeStyle = COLOR_DEVELOP_BOX
           this.funStrokeRect(poX, positionY, width, -height)
           this.funLines([centerX - movingDistance, 0], [centerX - movingDistance, -this.innerH])
         }
 
         // 轮廓
-        this.ctx.strokeStyle = this.colorObstacle
+        this.ctx.strokeStyle = COLOR_OBSTACLE
         this.ctx.lineWidth = 2
         // 嘴
         this.funLines(
@@ -390,10 +390,10 @@
 
         // eye
         this.funStrokeRect(poX, eyesY, width, height - width)
-        this.ctx.fillStyle = this.colorBackground
+        this.ctx.fillStyle = COLOR_BACKGROUND
         this.funFillCircle(poX + width / 2, eyesY, width)
         this.funStrokeCircle(poX + width / 2, eyesY, width)
-        this.ctx.fillStyle = this.colorObstacle
+        this.ctx.fillStyle = COLOR_OBSTACLE
         this.funFillCircle(poX + width / 2, eyesY, width / 2)
       }
 
@@ -402,7 +402,7 @@
         const eyesY = positionY - height + width / 2 + height / 9
         this.funStrokeRect(poX, positionY, width, -height)
         // 单眼
-        this.ctx.fillStyle = this.colorObstacle
+        this.ctx.fillStyle = COLOR_OBSTACLE
         this.funStrokeCircle(poX + width / 2, eyesY, (width - 8) / 2)
         this.funFillCircle(poX + width / 2, eyesY, (width - 8) / 5)
         // 眉
@@ -436,12 +436,12 @@
           [poX + width, eyesY]
         )
         // 双眼
-        this.ctx.fillStyle = this.colorBackground
+        this.ctx.fillStyle = COLOR_BACKGROUND
         this.funFillCircle(poX + width / 4, eyesY, width / 4)
         this.funFillCircle(poX + width / 4 * 3, eyesY, width / 4)
         this.funStrokeCircle(poX + width / 4, eyesY, width / 4)
         this.funStrokeCircle(poX + width / 4 * 3, eyesY, width / 4)
-        this.ctx.fillStyle = this.colorObstacle
+        this.ctx.fillStyle = COLOR_OBSTACLE
         this.funFillCircle(poX + width / 4, eyesY, width / 6)
         this.funFillCircle(poX + width / 4 * 3, eyesY, width / 6)
       }
@@ -489,7 +489,7 @@
         // 开发辅助线
         if (this.isDevelopment) {
           this.ctx.lineWidth = 2
-          this.ctx.strokeStyle = this.colorDevelopBox
+          this.ctx.strokeStyle = COLOR_DEVELOP_BOX
           this.funStrokeRect(x, 0 - this.peopleY, this.commonW, peopleH)
           // 辅助坐标线
           this.funLines(
@@ -510,14 +510,14 @@
           )
         }
         // head
-        this.ctx.fillStyle = this.colorPeople
+        this.ctx.fillStyle = COLOR_PEOPLE
         this.funFillCircle(
           x + this.commonW / 4 * 3 - this.commonW / 32 * 3,
           0 - this.peopleY + peopleH - (- this.commonH / 4),
           this.commonW / 6
         )
         this.ctx.lineWidth = 5
-        this.ctx.strokeStyle = this.colorPeople
+        this.ctx.strokeStyle = COLOR_PEOPLE
         this.ctx.lineCap = 'round'
         this.ctx.lineJoin = 'round'
         const bodyStartX = x + this.commonW / 4 * 2
@@ -542,13 +542,13 @@
         this.ctx.restore()
         if (this.isDevelopment) {
           // 开发模式 人物身上取的点
-          this.ctx.fillStyle = this.colorDevelopPoint
+          this.ctx.fillStyle = COLOR_DEVELOP_POINT
           this.ctx.save()
           this.ctx.translate(0, this.roadSurface)
           this.peoplePoints.forEach((item) => {
             this.funFillCircle(item[0], item[1], 2)
           })
-          // this.ctx.fillStyle = this.colorObstacle
+          // this.ctx.fillStyle = COLOR_OBSTACLE
           this.ctx.restore()
         }
         this.impactChecking()
